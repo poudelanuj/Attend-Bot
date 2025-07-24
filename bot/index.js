@@ -19,6 +19,7 @@ dotenv.config();
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
     ],
@@ -47,6 +48,56 @@ client.once('ready', async () => {
     } catch (error) {
         console.error('❌ Error registering slash commands:', error);
     }
+});
+
+import cron from 'node-cron';
+
+// 9:55 AM NPT Check-in DM (Mon–Fri)
+cron.schedule('55 9 * * 1-5', async () => {
+    try {
+        console.log("its running")
+        const guild = await client.guilds.fetch(process.env.GUILD_ID);
+        const members = await guild.members.fetch();
+        const usernames = members.map(m => m.user.tag);
+        console.log(usernames)
+        members.forEach(async (member) => {
+            if (!member.user.bot) {
+                try {
+                    await member.send('🌞 Good morning! Please don\'t forget to `/checkin` today.');
+                } catch (err) {
+                    console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+                }
+            }
+        });
+        console.log('✅ Check-in DMs sent at 9:55 AM NPT');
+    } catch (error) {
+        console.error('❌ Error during check-in DM:', error);
+    }
+}, {
+    timezone: 'Asia/Kathmandu'
+});
+
+// 4:55 PM NPT Check-out DM (Mon–Fri)
+cron.schedule('55 16 * * 1-5', async () => {
+    try {
+        const guild = await client.guilds.fetch(process.env.GUILD_ID);
+        const members = await guild.members.fetch();
+
+        members.forEach(async (member) => {
+            if (!member.user.bot) {
+                try {
+                    await member.send('🌇 The work day is over! Please remember to `/checkout` before leaving.');
+                } catch (err) {
+                    console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+                }
+            }
+        });
+        console.log('✅ Check-out DMs sent at 4:55 PM NPT');
+    } catch (error) {
+        console.error('❌ Error during check-out DM:', error);
+    }
+}, {
+    timezone: 'Asia/Kathmandu'
 });
 
 // Handle slash commands
