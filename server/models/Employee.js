@@ -42,14 +42,21 @@ export class Employee {
     return rows[0];
   }
 
-  static async getAttendanceHistory(employeeId, limit = 30) {
-    const [rows] = await pool.execute(
-      `SELECT * FROM attendance 
-       WHERE employee_id = ? 
-       ORDER BY date DESC 
-       LIMIT ?`,
-      [employeeId, limit]
-    );
-    return rows;
-  }
+    static async getAttendanceHistory(employeeId, limit = 30) {
+        const safeLimit = Number(limit);
+        if (isNaN(safeLimit) || safeLimit <= 0) {
+            throw new Error("Invalid limit provided.");
+        }
+
+        const [rows] = await pool.execute(
+            `SELECT * FROM attendance 
+     WHERE employee_id = ? 
+     ORDER BY date DESC 
+     LIMIT ${safeLimit}`, // injected safely after validation
+            [employeeId]
+        );
+        return rows;
+    }
+
+
 }

@@ -125,7 +125,7 @@ export default function EmployeeDetail() {
               <p className="text-gray-600">@{employee.username}</p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-gray-600">Email</p>
@@ -176,7 +176,9 @@ export default function EmployeeDetail() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.avg_rating?.toFixed(1) || 'N/A'}/5</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {!isNaN(parseFloat(stats.avg_rating)) ? parseFloat(stats.avg_rating).toFixed(1) : 'N/A'}/5
+                  </p>
                 </div>
               </div>
             </div>
@@ -188,7 +190,10 @@ export default function EmployeeDetail() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Avg Hours</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.avg_hours?.toFixed(1) || 'N/A'}h</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {!isNaN(parseFloat(stats.avg_hours)) ? parseFloat(stats.avg_hours).toFixed(1) : 'N/A'}h
+                  </p>
+
                 </div>
               </div>
             </div>
@@ -258,7 +263,7 @@ export default function EmployeeDetail() {
               </tbody>
             </table>
           </div>
-          
+
           {attendanceHistory.length === 0 && (
             <div className="px-6 py-8 text-center">
               <p className="text-gray-500">No attendance records found for this employee.</p>
