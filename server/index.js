@@ -1,0 +1,36 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { testConnection } from './database.js';
+import { authenticateToken } from './middleware/auth.js';
+
+// Routes
+import authRoutes from './routes/auth.js';
+import employeeRoutes from './routes/employees.js';
+import analyticsRoutes from './routes/analytics.js';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Test database connection
+testConnection();
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/employees', authenticateToken, employeeRoutes);
+app.use('/api/analytics', authenticateToken, analyticsRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
