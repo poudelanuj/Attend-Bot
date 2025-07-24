@@ -10,6 +10,7 @@ export class Employee {
   }
 
   static async create(employeeData) {
+    console.log(employeeData)
     const { discordId, username, displayName, email, department, position } = employeeData;
     const [result] = await pool.execute(
       `INSERT INTO employees (discord_id, username, display_name, email, department, position) 

@@ -110,7 +110,10 @@ async function processCheckIn(interaction) {
       await Employee.create({
         discordId: interaction.user.id,
         username: interaction.user.username,
-        displayName: interaction.user.displayName || interaction.user.username
+        displayName: interaction.user.displayName || interaction.user.username,
+        email: null,
+        department: null,
+        position: null
       });
       employee = await Employee.findByDiscordId(interaction.user.id);
     }

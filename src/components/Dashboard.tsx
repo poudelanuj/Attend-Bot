@@ -37,7 +37,7 @@ export default function Dashboard() {
         axios.get('/api/employees'),
         axios.get('/api/analytics/stats')
       ]);
-      
+
       setEmployees(employeesRes.data);
       setAnalytics(analyticsRes.data);
     } catch (error) {
@@ -130,7 +130,9 @@ export default function Dashboard() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.avgRating.toFixed(1)}/5</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.avgRating ? Number(stats.avgRating).toFixed(1) + '/5' : 'N/A'}
+                </p>
               </div>
             </div>
           </div>
@@ -143,25 +145,25 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.slice().reverse()}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="date" 
+                <XAxis
+                  dataKey="date"
                   tickFormatter={(value) => formatDate(value)}
                 />
                 <YAxis />
-                <Tooltip 
+                <Tooltip
                   labelFormatter={(value) => formatDate(value)}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="total_checkins" 
-                  stroke="#3b82f6" 
+                <Line
+                  type="monotone"
+                  dataKey="total_checkins"
+                  stroke="#3b82f6"
                   strokeWidth={2}
                   name="Check-ins"
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="total_checkouts" 
-                  stroke="#10b981" 
+                <Line
+                  type="monotone"
+                  dataKey="total_checkouts"
+                  stroke="#10b981"
                   strokeWidth={2}
                   name="Check-outs"
                 />
