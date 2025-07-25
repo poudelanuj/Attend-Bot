@@ -20,12 +20,15 @@ interface AttendanceData {
   };
 }
 
-interface ContributionDay {
-  date: string;
-  level: number; // 0-4 (0 = no activity, 4 = full day with high rating)
-  hasCheckin: boolean;
-  hasCheckout: boolean;
-  rating?: number;
+interface WeekData {
+  weekStart: string;
+  days: {
+    date: string;
+    level: number;
+    hasCheckin: boolean;
+    hasCheckout: boolean;
+    rating?: number;
+  }[];
 }
 
 export default function ContributionMatrix() {
@@ -56,16 +59,45 @@ export default function ContributionMatrix() {
     }
   };
 
-  const generateYearDays = (year: number): string[] => {
-    const days: string[] = [];
+  const generateWeekData = (year: number): WeekData[] => {
+    const weeks: WeekData[] = [];
     const startDate = new Date(year, 0, 1);
     const endDate = new Date(year, 11, 31);
     
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-      days.push(d.toISOString().split('T')[0]);
+    // Find the first Sunday of the year (or the year start if it's already Sunday)
+    const firstSunday = new Date(startDate);
+    firstSunday.setDate(startDate.getDate() - startDate.getDay());
+    
+    let currentWeekStart = new Date(firstSunday);
+    
+    while (currentWeekStart <= endDate) {
+      const weekDays: WeekData['days'] = [];
+      
+      for (let i = 0; i < 7; i++) {
+        const currentDay = new Date(currentWeekStart);
+        currentDay.setDate(currentWeekStart.getDate() + i);
+        
+        if (currentDay.getFullYear() === year) {
+          weekDays.push({
+            date: currentDay.toISOString().split('T')[0],
+            level: 0,
+            hasCheckin: false,
+            hasCheckout: false
+          });
+        }
+      }
+      
+      if (weekDays.length > 0) {
+        weeks.push({
+          weekStart: currentWeekStart.toISOString().split('T')[0],
+          days: weekDays
+        });
+      }
+      
+      currentWeekStart.setDate(currentWeekStart.getDate() + 7);
     }
     
-    return days;
+    return weeks;
   };
 
   const getContributionLevel = (employeeId: number, date: string): number => {
@@ -107,22 +139,23 @@ export default function ContributionMatrix() {
     return 'Activity recorded';
   };
 
-  const getMonthLabels = (): string[] => {
-    return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  };
-
   const getDayOfWeekLabels = (): string[] => {
-    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   };
 
-  const yearDays = generateYearDays(selectedYear);
-  const monthLabels = getMonthLabels();
+  const formatWeekLabel = (weekStart: string): string => {
+    const date = new Date(weekStart);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${month} ${day}`;
+  };
+
+  const weekData = generateWeekData(selectedYear);
   const dayLabels = getDayOfWeekLabels();
 
   // Calculate stats
   const totalEmployees = employees.length;
-  const totalPossibleDays = yearDays.length * totalEmployees;
+  const totalPossibleDays = weekData.reduce((total, week) => total + week.days.length, 0) * totalEmployees;
   const totalActiveDays = Object.values(attendanceData).reduce((total, employeeData) => {
     return total + Object.keys(employeeData).length;
   }, 0);
@@ -140,7 +173,7 @@ export default function ContributionMatrix() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
-        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <button
@@ -174,7 +207,7 @@ export default function ContributionMatrix() {
         </div>
       </header>
 
-      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6">
@@ -249,39 +282,26 @@ export default function ContributionMatrix() {
             </h2>
           </div>
           
-          <div className="p-6 overflow-x-auto">
-            <div className="min-w-max">
-              {/* Month headers */}
-              <div className="flex mb-2">
-                <div className="w-32 flex-shrink-0"></div>
-                <div className="flex">
-                  {monthLabels.map((month, index) => (
-                    <div key={month} className="text-xs text-gray-500 text-center" style={{ width: `${Math.floor(yearDays.filter(day => new Date(day).getMonth() === index).length * 12)}px` }}>
-                      {month}
-                    </div>
-                  ))}
-                </div>
+          <div className="p-6">
+            {/* Day of week headers */}
+            <div className="flex mb-4">
+              <div className="w-40 flex-shrink-0"></div>
+              <div className="w-16 flex-shrink-0 text-center text-xs text-gray-500 font-medium">Week</div>
+              <div className="flex gap-1">
+                {dayLabels.map((day, index) => (
+                  <div key={index} className="w-4 h-4 text-xs text-gray-500 flex items-center justify-center font-medium">
+                    {day}
+                  </div>
+                ))}
               </div>
+            </div>
 
-              {/* Day of week labels */}
-              <div className="flex mb-4">
-                <div className="w-32 flex-shrink-0"></div>
-                <div className="flex">
-                  {yearDays.map((day, index) => {
-                    const dayOfWeek = new Date(day).getDay();
-                    return (
-                      <div key={day} className="w-3 h-3 text-xs text-gray-400 flex items-center justify-center">
-                        {index % 7 === 0 ? dayLabels[dayOfWeek] : ''}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Employee rows */}
-              {employees.map((employee) => (
-                <div key={employee.id} className="flex items-center mb-2">
-                  <div className="w-32 flex-shrink-0 pr-4">
+            {/* Employee sections */}
+            {employees.map((employee) => (
+              <div key={employee.id} className="mb-8">
+                {/* Employee header */}
+                <div className="flex items-center mb-3">
+                  <div className="w-40 flex-shrink-0">
                     <div className="text-sm font-medium text-gray-900 truncate">
                       {employee.display_name || employee.username}
                     </div>
@@ -289,30 +309,40 @@ export default function ContributionMatrix() {
                       @{employee.username}
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    {yearDays.map((day) => {
-                      const level = getContributionLevel(employee.id, day);
-                      const attendance = attendanceData[employee.id]?.[day];
-                      const tooltip = getLevelTooltip(
-                        level, 
-                        attendance?.hasCheckin || false, 
-                        attendance?.hasCheckout || false, 
-                        attendance?.rating
-                      );
-                      
-                      return (
-                        <div
-                          key={day}
-                          className={`w-3 h-3 rounded-sm ${getLevelColor(level)} border border-gray-200`}
-                          title={`${day}: ${tooltip}`}
-                        />
-                      );
-                    })}
-                  </div>
                 </div>
-              ))}
+                
+                {/* Weekly rows for this employee */}
+                {weekData.map((week, weekIndex) => (
+                  <div key={week.weekStart} className="flex items-center mb-1">
+                    <div className="w-40 flex-shrink-0"></div>
+                    <div className="w-16 flex-shrink-0 text-xs text-gray-400 text-center">
+                      {formatWeekLabel(week.weekStart)}
+                    </div>
+                    <div className="flex gap-1">
+                      {week.days.map((day) => {
+                        const level = getContributionLevel(employee.id, day.date);
+                        const attendance = attendanceData[employee.id]?.[day.date];
+                        const tooltip = getLevelTooltip(
+                          level, 
+                          attendance?.hasCheckin || false, 
+                          attendance?.hasCheckout || false, 
+                          attendance?.rating
+                        );
+                        
+                        return (
+                          <div
+                            key={day.date}
+                            className={`w-4 h-4 rounded-sm ${getLevelColor(level)} border border-gray-200 hover:border-gray-400 transition-colors cursor-pointer`}
+                            title={`${day.date}: ${tooltip}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
             </div>
-          </div>
         </div>
       </div>
     </div>
