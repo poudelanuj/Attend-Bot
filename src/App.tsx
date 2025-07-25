@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import EmployeeDetail from './components/EmployeeDetail';
+import ContributionMatrix from './components/ContributionMatrix';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 function AppRoutes() {
@@ -29,6 +30,10 @@ function AppRoutes() {
       <Route 
         path="/employee/:id" 
         element={token ? <EmployeeDetail /> : <Navigate to="/login" />} 
+      />
+      <Route 
+        path="/matrix" 
+        element={token ? <ContributionMatrix /> : <Navigate to="/login" />} 
       />
     </Routes>
   );

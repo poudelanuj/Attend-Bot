@@ -8,6 +8,7 @@ import { authenticateToken } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
 import analyticsRoutes from './routes/analytics.js';
+import attendanceRoutes from './routes/attendance.js';
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ testConnection();
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', authenticateToken, employeeRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
+app.use('/api/attendance', authenticateToken, attendanceRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
