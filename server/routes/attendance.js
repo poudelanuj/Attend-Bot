@@ -8,11 +8,11 @@ router.get('/matrix', async (req, res) => {
     const year = req.query.year || new Date().getFullYear();
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
-    
+
     const [rows] = await pool.execute(`
       SELECT 
         a.employee_id,
-        DATE(a.date) as date,
+        DATE_FORMAT(a.date, '%Y-%m-%d') as date,
         a.check_in_time IS NOT NULL as has_checkin,
         a.check_out_time IS NOT NULL as has_checkout,
         a.overall_rating
@@ -20,7 +20,7 @@ router.get('/matrix', async (req, res) => {
       WHERE a.date BETWEEN ? AND ?
       ORDER BY a.employee_id, a.date
     `, [startDate, endDate]);
-    
+
     // Transform data into nested object structure
     const matrixData = {};
     rows.forEach(row => {
@@ -33,7 +33,7 @@ router.get('/matrix', async (req, res) => {
         rating: row.overall_rating
       };
     });
-    
+
     res.json(matrixData);
   } catch (error) {
     console.error('Error fetching matrix data:', error);
