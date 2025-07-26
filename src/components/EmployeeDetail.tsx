@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Star, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Star, TrendingUp, Grid } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import axios from 'axios';
 
 interface Employee {
@@ -34,12 +35,22 @@ interface EmployeeStats {
   avg_hours: number;
 }
 
+interface AttendanceData {
+  [date: string]: {
+    hasCheckin: boolean;
+    hasCheckout: boolean;
+    rating?: number;
+  };
+}
+
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<EmployeeStats | null>(null);
+  const [attendanceData, setAttendanceData] = useState<AttendanceData>({});
+  const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -48,15 +59,120 @@ export default function EmployeeDetail() {
 
   const fetchEmployeeDetail = async () => {
     try {
-      const response = await axios.get(`/api/employees/${id}`);
-      setEmployee(response.data.employee);
-      setAttendanceHistory(response.data.attendanceHistory);
-      setStats(response.data.stats);
+      const [employeeRes, matrixRes] = await Promise.all([
+        axios.get(`/api/employees/${id}`),
+        axios.get(`/api/attendance/matrix?year=${new Date().getFullYear()}`)
+      ]);
+      
+      setEmployee(employeeRes.data.employee);
+      setAttendanceHistory(employeeRes.data.attendanceHistory);
+      setStats(employeeRes.data.stats);
+      setAttendanceData(matrixRes.data[parseInt(id!)] || {});
+      
+      // Generate monthly stats
+      const monthlyData = generateMonthlyStats(employeeRes.data.attendanceHistory);
+      setMonthlyStats(monthlyData);
     } catch (error) {
       console.error('Error fetching employee details:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateMonthlyStats = (records: AttendanceRecord[]) => {
+    const monthlyMap = new Map();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    records.forEach(record => {
+      const date = new Date(record.date);
+      const monthKey = `${months[date.getMonth()]} ${date.getFullYear()}`;
+      
+      if (!monthlyMap.has(monthKey)) {
+        monthlyMap.set(monthKey, {
+          month: monthKey,
+          totalDays: 0,
+          completedDays: 0,
+          avgRating: 0,
+          totalRating: 0,
+          ratingCount: 0
+        });
+      }
+      
+      const monthData = monthlyMap.get(monthKey);
+      monthData.totalDays++;
+      
+      if (record.check_out_time) {
+        monthData.completedDays++;
+      }
+      
+      if (record.overall_rating) {
+        monthData.totalRating += record.overall_rating;
+        monthData.ratingCount++;
+      }
+    });
+    
+    return Array.from(monthlyMap.values()).map(month => ({
+      ...month,
+      avgRating: month.ratingCount > 0 ? (month.totalRating / month.ratingCount).toFixed(1) : 0
+    })).slice(-12);
+  };
+
+  const generateContributionMatrix = () => {
+    const year = new Date().getFullYear();
+    const weeks = [];
+    const firstDay = new Date(year, 0, 1);
+    const startDate = new Date(firstDay);
+    startDate.setDate(firstDay.getDate() - firstDay.getDay());
+    
+    let currentDate = new Date(startDate);
+    
+    for (let week = 0; week < 53; week++) {
+      const weekData = [];
+      const weekStart = new Date(currentDate);
+      
+      for (let day = 0; day < 7; day++) {
+        const dayDate = new Date(currentDate);
+        const dateStr = dayDate.toISOString().split('T')[0];
+        const attendance = attendanceData[dateStr];
+        
+        let level = 0;
+        if (attendance) {
+          if (attendance.hasCheckin && attendance.hasCheckout) {
+            if (attendance.rating && attendance.rating >= 5) level = 4;
+            else if (attendance.rating && attendance.rating >= 4) level = 3;
+            else level = 2;
+          } else if (attendance.hasCheckin || attendance.hasCheckout) {
+            level = 1;
+          }
+        }
+        
+        weekData.push({
+          date: dayDate,
+          dateStr,
+          level,
+          isCurrentYear: dayDate.getFullYear() === year
+        });
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      weeks.push({ weekStart, days: weekData });
+      if (weekStart.getFullYear() > year) break;
+    }
+    
+    return weeks;
+  };
+
+  const getLevelColor = (level: number, isCurrentYear: boolean): string => {
+    if (!isCurrentYear) return 'bg-gray-100';
+    const colors = {
+      0: 'bg-gray-200',
+      1: 'bg-green-200',
+      2: 'bg-green-300',
+      3: 'bg-green-400',
+      4: 'bg-green-500'
+    };
+    return colors[level] || colors[0];
   };
 
   const formatDate = (dateString: string) => {
@@ -73,6 +189,15 @@ export default function EmployeeDetail() {
     return 'text-red-600 bg-red-100';
   };
 
+  // Pie chart data for ratings distribution
+  const ratingDistribution = [
+    { name: '5 Stars', value: attendanceHistory.filter(r => r.overall_rating === 5).length, color: '#10b981' },
+    { name: '4 Stars', value: attendanceHistory.filter(r => r.overall_rating === 4).length, color: '#3b82f6' },
+    { name: '3 Stars', value: attendanceHistory.filter(r => r.overall_rating === 3).length, color: '#f59e0b' },
+    { name: '2 Stars', value: attendanceHistory.filter(r => r.overall_rating === 2).length, color: '#ef4444' },
+    { name: '1 Star', value: attendanceHistory.filter(r => r.overall_rating === 1).length, color: '#6b7280' },
+  ].filter(item => item.value > 0);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -88,6 +213,8 @@ export default function EmployeeDetail() {
       </div>
     );
   }
+
+  const contributionWeeks = generateContributionMatrix();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -193,12 +320,164 @@ export default function EmployeeDetail() {
                   <p className="text-2xl font-bold text-gray-900">
                     {!isNaN(parseFloat(stats.avg_hours)) ? parseFloat(stats.avg_hours).toFixed(1) : 'N/A'}h
                   </p>
-
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Contribution Matrix */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Contribution Matrix ({new Date().getFullYear()})</h3>
+            <div className="flex items-center gap-4 text-sm text-gray-600">
+              <span>Less</span>
+              <div className="flex gap-1">
+                <div className="w-3 h-3 rounded-sm bg-gray-200"></div>
+                <div className="w-3 h-3 rounded-sm bg-green-200"></div>
+                <div className="w-3 h-3 rounded-sm bg-green-300"></div>
+                <div className="w-3 h-3 rounded-sm bg-green-400"></div>
+                <div className="w-3 h-3 rounded-sm bg-green-500"></div>
+              </div>
+              <span>More</span>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <div className="min-w-full">
+              <div className="flex mb-2">
+                <div className="w-20 text-xs text-gray-600"></div>
+                <div className="flex">
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+                    <div key={index} className="w-4 text-xs text-gray-600 text-center">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {contributionWeeks.map((week, weekIndex) => {
+                const isCurrentYearWeek = week.days.some(day => day.isCurrentYear);
+                if (!isCurrentYearWeek) return null;
+                
+                return (
+                  <div key={weekIndex} className="flex items-center mb-1">
+                    <div className="w-20 text-xs text-gray-600 text-right pr-2">
+                      {week.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                    <div className="flex gap-1">
+                      {week.days.map((dayData, dayIndex) => (
+                        <div
+                          key={dayIndex}
+                          className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-gray-400 ${getLevelColor(dayData.level, dayData.isCurrentYear)}`}
+                          title={`${dayData.date.toLocaleDateString()}: ${dayData.level === 0 ? 'No activity' : 'Active'}`}
+                        ></div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Rating Distribution */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Rating Distribution</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={ratingDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {ratingDistribution.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-4 mt-4">
+              {ratingDistribution.map((item, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                  <span className="text-sm text-gray-600">{item.name}: {item.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Monthly Trends */}
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Attendance Trends</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyStats}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="completedDays" fill="#3b82f6" name="Completed Days" />
+                  <Bar dataKey="totalDays" fill="#e5e7eb" name="Total Days" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly Work Summary */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Monthly Work Summary</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Days</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed Days</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completion Rate</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Rating</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {monthlyStats.map((month, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {month.month}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {month.totalDays}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {month.completedDays}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {month.totalDays > 0 ? Math.round((month.completedDays / month.totalDays) * 100) : 0}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {month.avgRating > 0 ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(parseFloat(month.avgRating))}`}>
+                          {month.avgRating}/5
+                        </span>
+                      ) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         {/* Attendance History */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -209,24 +488,12 @@ export default function EmployeeDetail() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Check-in
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Check-out
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rating
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Today's Plan
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rating</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Today's Plan</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
