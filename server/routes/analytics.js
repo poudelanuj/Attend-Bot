@@ -91,7 +91,7 @@ router.get('/today-records', async (req, res) => {
         a.overall_rating,
         CASE 
           WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
-          THEN TIMESTAMPDIFF(HOUR, a.check_in_time, a.check_out_time)
+          THEN ROUND(TIMESTAMPDIFF(MINUTE, a.check_in_time, a.check_out_time) / 60.0, 1)
           ELSE NULL 
         END as hours_worked
       FROM employees e
@@ -107,4 +107,24 @@ router.get('/today-records', async (req, res) => {
   }
 });
 
+router.get('/checkin-status', async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    
+    const [statusData] = await pool.execute(`
+      SELECT 
+        SUM(CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL THEN 1 ELSE 0 END) as completed,
+        SUM(CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NULL THEN 1 ELSE 0 END) as checked_in_only,
+        SUM(CASE WHEN a.check_in_time IS NULL THEN 1 ELSE 0 END) as not_checked_in
+      FROM employees e
+      LEFT JOIN attendance a ON e.id = a.employee_id AND DATE(a.date) = ?
+      WHERE e.is_active = 1
+    `, [today]);
+
+    res.json(statusData[0]);
+  } catch (error) {
+    console.error('Error fetching checkin status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 export default router;
