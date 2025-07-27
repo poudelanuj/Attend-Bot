@@ -331,7 +331,7 @@ export default function EmployeeDetail() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Avg Rating</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {!isNaN(parseFloat(stats.avg_rating)) ? parseFloat(stats.avg_rating).toFixed(1) : 'N/A'}/5
+                        {stats.avg_rating && !isNaN(parseFloat(stats.avg_rating)) ? parseFloat(stats.avg_rating).toFixed(1) : '0.0'}/5
                       </p>
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export default function EmployeeDetail() {
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">Avg Hours</p>
                       <p className="text-2xl font-bold text-gray-900">
-                        {!isNaN(parseFloat(stats.avg_hours)) ? parseFloat(stats.avg_hours).toFixed(1) : 'N/A'}h
+                        {stats.avg_hours && !isNaN(parseFloat(stats.avg_hours)) ? parseFloat(stats.avg_hours).toFixed(1) : '0.0'}h
                       </p>
                     </div>
                   </div>
