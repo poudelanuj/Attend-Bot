@@ -1,0 +1,65 @@
+name: discord-attendance-bot
+
+services:
+  backend:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: 595739921426.dkr.ecr.ap-south-1.amazonaws.com/attendbot/backend:latest
+    ports:
+      - "5005:5005"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - PORT=5005
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+
+    depends_on:
+      - bot
+    networks:
+      - app-network
+    command: node index.js --port 5005
+
+  bot:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    image: 595739921426.dkr.ecr.ap-south-1.amazonaws.com/attendbot/bot:latest
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+    networks:
+      - app-network
+    command: npm run bot
+
+  frontend:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 595739921426.dkr.ecr.ap-south-1.amazonaws.com/attendbot/frontend:latest
+    ports:
+      - "3005:3005"
+    volumes:
+      - ./dist:/app/dist
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+    networks:
+      - app-network
+    command: npm run build
+
+networks:
+  app-network:
+    driver: bridge

@@ -58,6 +58,7 @@ interface TodayRecord {
   hours_worked: number;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
 export default function Dashboard() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [analytics, setAnalytics] = useState<AnalyticsData[]>([]);
@@ -74,10 +75,10 @@ export default function Dashboard() {
   const fetchData = async () => {
     try {
       const [employeesRes, analyticsRes, kpisRes, todayRes] = await Promise.all([
-        axios.get('/api/employees'),
-        axios.get('/api/analytics/stats'),
-        axios.get('/api/analytics/kpis'),
-        axios.get('/api/analytics/today-records')
+        axios.get(`${API_URL}/api/employees`),
+        axios.get(`${API_URL}/api/analytics/stats`),
+        axios.get(`${API_URL}/api/analytics/kpis`),
+        axios.get(`${API_URL}/api/analytics/today-records`)
       ]);
 
       setEmployees(employeesRes.data);

@@ -368,3 +368,5 @@ Average rating: ${formattedRating}/5`,
 }
 
 client.login(process.env.DISCORD_TOKEN);
+
+

@@ -91,8 +91,6 @@ npm run bot
 ```
 
 ### 7. Access the Dashboard
-- Open http://localhost:5173 in your browser
-- Login with: admin / admin123 (or your configured credentials)
 
 ## Discord Commands
 

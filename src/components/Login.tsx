@@ -7,7 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,11 +16,11 @@ export default function Login() {
     setError('');
 
     const success = await login(username, password);
-    
+
     if (!success) {
       setError('Invalid credentials. Please try again.');
     }
-    
+
     setLoading(false);
   };
 
@@ -93,7 +93,6 @@ export default function Login() {
 
         <div className="mt-6 p-4 bg-gray-50 rounded-lg">
           <p className="text-xs text-gray-600 text-center">
-            Default credentials: admin / admin123
           </p>
         </div>
       </div>

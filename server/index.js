@@ -13,11 +13,13 @@ import attendanceRoutes from './routes/attendance.js';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3005;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: process.env.ORIGIN,
+  credentials: true // Allow cookies or Authorization headers
+}));app.use(express.json());
 
 // Test database connection
 testConnection();

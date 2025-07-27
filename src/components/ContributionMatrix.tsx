@@ -19,7 +19,7 @@ interface AttendanceData {
     };
   };
 }
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
 export default function ContributionMatrix() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceData>({});
@@ -45,8 +45,8 @@ export default function ContributionMatrix() {
   const fetchData = async () => {
     try {
       const [employeesRes, attendanceRes] = await Promise.all([
-        axios.get('/api/employees'),
-        axios.get(`/api/attendance/matrix?year=${selectedYear}`)
+        axios.get(`${API_URL}/api/employees`),
+        axios.get(`${API_URL}/api/attendance/matrix?year=${selectedYear}`)
       ]);
       setEmployees(employeesRes.data);
       setAttendanceData(attendanceRes.data);

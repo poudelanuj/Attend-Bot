@@ -9,7 +9,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -25,13 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await axios.post('/api/auth/login', { username, password });
+      const response = await axios.post(`${API_URL}/api/auth/login`, { username, password });
       const { token: newToken } = response.data;
-      
+
       setToken(newToken);
       localStorage.setItem('adminToken', newToken);
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
-      
+
       return true;
     } catch (error) {
       console.error('Login failed:', error);

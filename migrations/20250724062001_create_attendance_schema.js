@@ -44,9 +44,9 @@ export const up = async function (knex) {
 
     // Insert default admin user (password: admin123)
     const saltRounds = 10;
-    const passwordHash = await bcrypt.hash('admin123', saltRounds);
+    const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, saltRounds);
     await knex('admin_users').insert({
-        username: 'admin',
+        username: process.env.ADMIN_USERNAME,
         password_hash: passwordHash,
     });
 

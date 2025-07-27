@@ -42,7 +42,7 @@ interface AttendanceData {
     rating?: number;
   };
 }
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -67,8 +67,8 @@ export default function EmployeeDetail() {
   const fetchEmployeeDetail = async () => {
     try {
       const [employeeRes, matrixRes] = await Promise.all([
-        axios.get(`/api/employees/${id}`),
-        axios.get(`/api/attendance/matrix?year=${new Date().getFullYear()}`)
+        axios.get(`${API_URL}/api/employees/${id}`),
+        axios.get(`${API_URL}/api/attendance/matrix?year=${new Date().getFullYear()}`)
       ]);
 
       setEmployee(employeeRes.data.employee);
