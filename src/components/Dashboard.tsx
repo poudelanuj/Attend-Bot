@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, TrendingUp, Clock, Star, LogOut, Eye, Grid, Calendar, Target, Award } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
