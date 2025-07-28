@@ -6,6 +6,16 @@ export class Attendance {
     const today = moment().format('YYYY-MM-DD');
     const { todayPlan, yesterdayTask, currentStatus, workFrom } = checkInData;
     
+    // Check if already checked in today
+    const [existing] = await pool.execute(
+      'SELECT check_in_time FROM attendance WHERE employee_id = ? AND date = ?',
+      [employeeId, today]
+    );
+    
+    if (existing.length > 0 && existing[0].check_in_time) {
+      throw new Error('Already checked in today');
+    }
+    
     const [result] = await pool.execute(
       `INSERT INTO attendance (employee_id, date, check_in_time, today_plan, yesterday_task, current_status, work_from)
        VALUES (?, ?, NOW(), ?, ?, ?, ?)
@@ -19,6 +29,16 @@ export class Attendance {
   static async checkOut(employeeId, checkOutData) {
     const today = moment().format('YYYY-MM-DD');
     const { accomplishments, blockers, tomorrowPriorities, overallRating } = checkOutData;
+    
+    // Check if already checked out today
+    const [existing] = await pool.execute(
+      'SELECT check_out_time FROM attendance WHERE employee_id = ? AND date = ?',
+      [employeeId, today]
+    );
+    
+    if (existing.length > 0 && existing[0].check_out_time) {
+      throw new Error('Already checked out today');
+    }
     
     const [result] = await pool.execute(
       `UPDATE attendance 
