@@ -171,6 +171,19 @@ async function handleCheckIn(interaction) {
 
 async function processCheckIn(interaction) {
     try {
+        // Check if user already checked in today
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+        if (employee) {
+            const todayAttendance = await Attendance.getTodayAttendance(employee.id);
+            if (todayAttendance && todayAttendance.check_in_time) {
+                await interaction.reply({
+                    content: '❌ You have already checked in today. You can only check in once per day.',
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+
         const todayPlan = interaction.fields.getTextInputValue('today_plan');
         const yesterdayTask = interaction.fields.getTextInputValue('yesterday_task');
         const currentStatus = interaction.fields.getTextInputValue('current_status');
@@ -195,7 +208,6 @@ async function processCheckIn(interaction) {
             return;
         }
 
-        let employee = await Employee.findByDiscordId(interaction.user.id);
         if (!employee) {
             await Employee.create({
                 discordId: interaction.user.id,
