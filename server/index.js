@@ -9,6 +9,7 @@ import authRoutes from './routes/auth.js';
 import employeeRoutes from './routes/employees.js';
 import analyticsRoutes from './routes/analytics.js';
 import attendanceRoutes from './routes/attendance.js';
+import holidayRoutes from './routes/holidays.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', authenticateToken, employeeRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
 app.use('/api/attendance', authenticateToken, attendanceRoutes);
+app.use('/api/holidays', authenticateToken, holidayRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
