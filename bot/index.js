@@ -8,11 +8,19 @@ import {
     TextInputStyle,
     REST,
     Routes,
-    SlashCommandBuilder
+    SlashCommandBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    ButtonBuilder,
+    ButtonStyle
 } from 'discord.js';
 import dotenv from 'dotenv';
 import {Employee} from '../server/models/Employee.js';
 import {Attendance} from '../server/models/Attendance.js';
+import cron from 'node-cron';
+
+// Temporary storage for select menu choices
+const checkInSelections = new Map();
 
 dotenv.config();
 
@@ -50,15 +58,13 @@ client.once('ready', async () => {
     }
 });
 
-import cron from 'node-cron';
-
 // 9:55 AM NPT Check-in DM (Mon–Fri, excluding Saturday)
-cron.schedule('55 9 * * 1-5', async () => {
+cron.schedule('55 9 * * 0-5', async () => {
     try {
-        console.log("Check-in reminder running at 9:55 AM NPT")
+        console.log("Check-in reminder running at 9:55 AM NPT");
         const guild = await client.guilds.fetch(process.env.GUILD_ID);
         const members = await guild.members.fetch();
-        
+
         members.forEach(async (member) => {
             if (!member.user.bot) {
                 try {
@@ -77,9 +83,9 @@ cron.schedule('55 9 * * 1-5', async () => {
 });
 
 // 4:55 PM NPT Check-out DM (Mon–Fri, excluding Sunday)
-cron.schedule('55 16 * * 1-6', async () => {
+cron.schedule('55 16 * * 0-5', async () => {
     try {
-        console.log("Check-out reminder running at 4:55 PM NPT")
+        console.log("Check-out reminder running at 4:55 PM NPT");
         const guild = await client.guilds.fetch(process.env.GUILD_ID);
         const members = await guild.members.fetch();
 
@@ -100,76 +106,33 @@ cron.schedule('55 16 * * 1-6', async () => {
     timezone: 'Asia/Kathmandu'
 });
 
-// Handle slash commands
+// Handle interactions (slash commands, select menus, buttons, modals)
 client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const {commandName} = interaction;
-
-    if (commandName === 'checkin') {
-        await handleCheckIn(interaction);
-    } else if (commandName === 'checkout') {
-        await handleCheckOut(interaction);
-    } else if (commandName === 'status') {
-        await handleStatus(interaction);
-    }
-});
-
-// Handle modal submissions
-client.on('interactionCreate', async (interaction) => {
-    if (!interaction.isModalSubmit()) return;
-
-    if (interaction.customId === 'checkin_modal') {
-        await processCheckIn(interaction);
-    } else if (interaction.customId === 'checkout_modal') {
-        await processCheckOut(interaction);
+    if (interaction.isChatInputCommand()) {
+        const {commandName} = interaction;
+        if (commandName === 'checkin') {
+            await handleCheckIn(interaction);
+        } else if (commandName === 'checkout') {
+            await handleCheckOut(interaction);
+        } else if (commandName === 'status') {
+            await handleStatus(interaction);
+        }
+    } else if (interaction.isStringSelectMenu()) {
+        await handleSelectMenu(interaction);
+    } else if (interaction.isButton()) {
+        if (interaction.customId === 'proceed_checkin') {
+            await handleProceedButton(interaction);
+        }
+    } else if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'checkin_modal') {
+            await processCheckIn(interaction);
+        } else if (interaction.customId === 'checkout_modal') {
+            await processCheckOut(interaction);
+        }
     }
 });
 
 async function handleCheckIn(interaction) {
-    const modal = new ModalBuilder()
-        .setCustomId('checkin_modal')
-        .setTitle('Daily Check-in');
-
-    const todayPlanInput = new TextInputBuilder()
-        .setCustomId('today_plan')
-        .setLabel("What's your plan for today?")
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Describe your main tasks and goals for today...')
-        .setRequired(true);
-
-    const yesterdayTaskInput = new TextInputBuilder()
-        .setCustomId('yesterday_task')
-        .setLabel("What did you work on yesterday?")
-        .setStyle(TextInputStyle.Paragraph)
-        .setPlaceholder('Briefly describe yesterday\'s accomplishments...')
-        .setRequired(true);
-
-    const statusInput = new TextInputBuilder()
-        .setCustomId('current_status')
-        .setLabel('How are you feeling today?')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Select: Excellent, Good, Okay, Tired, Stressed, Sick, Motivated')
-        .setRequired(true);
-
-    const workFromInput = new TextInputBuilder()
-        .setCustomId('work_from')
-        .setLabel('Work From')
-        .setStyle(TextInputStyle.Short)
-        .setPlaceholder('Enter: office or remote')
-        .setRequired(true);
-
-    const firstActionRow = new ActionRowBuilder().addComponents(todayPlanInput);
-    const secondActionRow = new ActionRowBuilder().addComponents(yesterdayTaskInput);
-    const thirdActionRow = new ActionRowBuilder().addComponents(statusInput);
-    const fourthActionRow = new ActionRowBuilder().addComponents(workFromInput);
-
-    modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
-
-    await interaction.showModal(modal);
-}
-
-async function processCheckIn(interaction) {
     try {
         // Check if user already checked in today
         const employee = await Employee.findByDiscordId(interaction.user.id);
@@ -184,30 +147,184 @@ async function processCheckIn(interaction) {
             }
         }
 
+        // Create work_from select menu
+        const workFromSelect = new StringSelectMenuBuilder()
+            .setCustomId('work_from_select')
+            .setPlaceholder('Select work location')
+            .addOptions(
+                new StringSelectMenuOptionBuilder().setLabel('Office').setValue('office'),
+                new StringSelectMenuOptionBuilder().setLabel('Remote').setValue('remote')
+            );
+
+        const proceedButton = new ButtonBuilder()
+            .setCustomId('proceed_checkin')
+            .setLabel('Proceed to Check-in')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(true); // Disabled until both selections are made
+
+        const workFromRow = new ActionRowBuilder().addComponents(workFromSelect);
+        const buttonRow = new ActionRowBuilder().addComponents(proceedButton);
+
+        // Initialize selections
+        checkInSelections.set(interaction.user.id, {});
+
+        await interaction.reply({
+            content: 'Please select your work location:',
+            components: [workFromRow, buttonRow],
+            ephemeral: true
+        });
+    } catch (error) {
+        console.error('Check-in initiation error:', error);
+        await interaction.reply({content: '❌ Error initiating check-in. Please try again.', ephemeral: true});
+    }
+}
+
+async function handleSelectMenu(interaction) {
+    try {
+        const userSelections = checkInSelections.get(interaction.user.id) || {};
+
+        if (interaction.customId === 'work_from_select') {
+            userSelections.workFrom = interaction.values[0];
+            checkInSelections.set(interaction.user.id, userSelections);
+
+            // Update to show work_from selection and add status_select
+            const workFromSelect = new StringSelectMenuBuilder()
+                .setCustomId('work_from_select')
+                .setPlaceholder(userSelections.workFrom.charAt(0).toUpperCase() + userSelections.workFrom.slice(1))
+                .addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(userSelections.workFrom.charAt(0).toUpperCase() + userSelections.workFrom.slice(1))
+                        .setValue(userSelections.workFrom)
+                        .setDefault(true)
+                )
+                .setDisabled(true);
+
+            const statusSelect = new StringSelectMenuBuilder()
+                .setCustomId('status_select')
+                .setPlaceholder('How are you feeling today?')
+                .addOptions(
+                    ['Excellent', 'Good', 'Okay', 'Tired', 'Stressed', 'Sick', 'Motivated', 'Anxious', 'Overwhelmed', 'Focused']
+                        .map(status => new StringSelectMenuOptionBuilder()
+                            .setLabel(status)
+                            .setValue(status.toLowerCase()))
+                );
+
+            const proceedButton = new ButtonBuilder()
+                .setCustomId('proceed_checkin')
+                .setLabel('Proceed to Check-in')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(true);
+
+            const workFromRow = new ActionRowBuilder().addComponents(workFromSelect);
+            const statusRow = new ActionRowBuilder().addComponents(statusSelect);
+            const buttonRow = new ActionRowBuilder().addComponents(proceedButton);
+
+            await interaction.update({
+                content: 'Work location selected. Now select how you are feeling today:',
+                components: [workFromRow, statusRow, buttonRow],
+                ephemeral: true
+            });
+        } else if (interaction.customId === 'status_select') {
+            userSelections.currentStatus = interaction.values[0];
+            checkInSelections.set(interaction.user.id, userSelections);
+
+            // Update to enable proceed button
+            const workFromSelect = new StringSelectMenuBuilder()
+                .setCustomId('work_from_select')
+                .setPlaceholder(userSelections.workFrom.charAt(0).toUpperCase() + userSelections.workFrom.slice(1))
+                .addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(userSelections.workFrom.charAt(0).toUpperCase() + userSelections.workFrom.slice(1))
+                        .setValue(userSelections.workFrom)
+                        .setDefault(true)
+                )
+                .setDisabled(true);
+
+            const statusSelect = new StringSelectMenuBuilder()
+                .setCustomId('status_select')
+                .setPlaceholder(userSelections.currentStatus.charAt(0).toUpperCase() + userSelections.currentStatus.slice(1))
+                .addOptions(
+                    new StringSelectMenuOptionBuilder()
+                        .setLabel(userSelections.currentStatus.charAt(0).toUpperCase() + userSelections.currentStatus.slice(1))
+                        .setValue(userSelections.currentStatus)
+                        .setDefault(true)
+                )
+                .setDisabled(true);
+
+            const proceedButton = new ButtonBuilder()
+                .setCustomId('proceed_checkin')
+                .setLabel('Proceed to Check-in')
+                .setStyle(ButtonStyle.Primary)
+                .setDisabled(false);
+
+            const workFromRow = new ActionRowBuilder().addComponents(workFromSelect);
+            const statusRow = new ActionRowBuilder().addComponents(statusSelect);
+            const buttonRow = new ActionRowBuilder().addComponents(proceedButton);
+
+            await interaction.update({
+                content: 'Status selected. Click "Proceed to Check-in" to continue:',
+                components: [workFromRow, statusRow, buttonRow],
+                ephemeral: true
+            });
+        }
+    } catch (error) {
+        console.error('Select menu error:', error);
+        await interaction.update({content: '❌ Error processing selection. Please try again.', ephemeral: true});
+    }
+}
+
+async function handleProceedButton(interaction) {
+    try {
+        const userSelections = checkInSelections.get(interaction.user.id);
+        if (!userSelections || !userSelections.workFrom || !userSelections.currentStatus) {
+            await interaction.reply({content: '❌ Please select both work location and status before proceeding.', ephemeral: true});
+            return;
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId('checkin_modal')
+            .setTitle('Daily Check-in');
+
+        const todayPlanInput = new TextInputBuilder()
+            .setCustomId('today_plan')
+            .setLabel("What's your plan for today?")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Describe your main tasks and goals for today...')
+            .setRequired(true);
+
+        const yesterdayTaskInput = new TextInputBuilder()
+            .setCustomId('yesterday_task')
+            .setLabel("What did you work on yesterday?")
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Briefly describe yesterday\'s accomplishments...')
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(todayPlanInput),
+            new ActionRowBuilder().addComponents(yesterdayTaskInput)
+        );
+
+        await interaction.showModal(modal);
+    } catch (error) {
+        console.error('Proceed button error:', error);
+        await interaction.reply({content: '❌ Error proceeding to check-in. Please try again.', ephemeral: true});
+    }
+}
+
+async function processCheckIn(interaction) {
+    try {
+        const userSelections = checkInSelections.get(interaction.user.id);
+        if (!userSelections || !userSelections.currentStatus || !userSelections.workFrom) {
+            await interaction.reply({content: '❌ Missing status or work location. Please start over with /checkin.', ephemeral: true});
+            return;
+        }
+
         const todayPlan = interaction.fields.getTextInputValue('today_plan');
         const yesterdayTask = interaction.fields.getTextInputValue('yesterday_task');
-        const currentStatus = interaction.fields.getTextInputValue('current_status');
-        const workFrom = interaction.fields.getTextInputValue('work_from');
+        const currentStatus = userSelections.currentStatus;
+        const workFrom = userSelections.workFrom;
 
-        // Validate feeling input
-        const validFeelings = ['excellent', 'good', 'okay', 'tired', 'stressed', 'sick', 'motivated'];
-        if (!validFeelings.includes(currentStatus.toLowerCase())) {
-            await interaction.reply({
-                content: '❌ Please enter a valid feeling: Excellent, Good, Okay, Tired, Stressed, Sick, or Motivated',
-                ephemeral: true
-            });
-            return;
-        }
-
-        // Validate work from input
-        if (!['office', 'remote'].includes(workFrom.toLowerCase())) {
-            await interaction.reply({
-                content: '❌ Please enter either "office" or "remote" for work location',
-                ephemeral: true
-            });
-            return;
-        }
-
+        let employee = await Employee.findByDiscordId(interaction.user.id);
         if (!employee) {
             await Employee.create({
                 discordId: interaction.user.id,
@@ -224,7 +341,7 @@ async function processCheckIn(interaction) {
             todayPlan,
             yesterdayTask,
             currentStatus,
-            workFrom: workFrom.toLowerCase()
+            workFrom
         });
 
         const embed = new EmbedBuilder()
@@ -234,11 +351,14 @@ async function processCheckIn(interaction) {
             .addFields(
                 {name: '🎯 Today\'s Plan', value: todayPlan, inline: false},
                 {name: '📋 Yesterday\'s Task', value: yesterdayTask, inline: false},
-                {name: '💭 Feeling Today', value: currentStatus, inline: true},
+                {name: '💭 Feeling Today', value: currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1), inline: true},
                 {name: '🏢 Work From', value: workFrom.charAt(0).toUpperCase() + workFrom.slice(1), inline: true}
             )
             .setTimestamp()
             .setFooter({text: 'Have a productive day!'});
+
+        // Clear selections after successful check-in
+        checkInSelections.delete(interaction.user.id);
 
         await interaction.reply({embeds: [embed], ephemeral: true});
     } catch (error) {
@@ -395,9 +515,7 @@ async function handleStatus(interaction) {
 
             embed.addFields({
                 name: '📈 30-Day Stats',
-                value: `Days worked: ${stats.total_days}
-Completed days: ${stats.completed_days}
-Average rating: ${formattedRating}/5`,
+                value: `Days worked: ${stats.total_days}\nCompleted days: ${stats.completed_days}\nAverage rating: ${formattedRating}/5`,
                 inline: true
             });
         }
@@ -410,5 +528,3 @@ Average rating: ${formattedRating}/5`,
 }
 
 client.login(process.env.DISCORD_TOKEN);
-
-
