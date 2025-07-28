@@ -85,6 +85,7 @@ router.get('/today-records', async (req, res) => {
         a.today_plan,
         a.yesterday_task,
         a.current_status,
+        a.work_from,
         a.accomplishments,
         a.blockers,
         a.tomorrow_priorities,

@@ -4,14 +4,14 @@ import moment from 'moment';
 export class Attendance {
   static async checkIn(employeeId, checkInData) {
     const today = moment().format('YYYY-MM-DD');
-    const { todayPlan, yesterdayTask, currentStatus } = checkInData;
+    const { todayPlan, yesterdayTask, currentStatus, workFrom } = checkInData;
     
     const [result] = await pool.execute(
-      `INSERT INTO attendance (employee_id, date, check_in_time, today_plan, yesterday_task, current_status)
-       VALUES (?, ?, NOW(), ?, ?, ?)
+      `INSERT INTO attendance (employee_id, date, check_in_time, today_plan, yesterday_task, current_status, work_from)
+       VALUES (?, ?, NOW(), ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE 
-       check_in_time = NOW(), today_plan = ?, yesterday_task = ?, current_status = ?`,
-      [employeeId, today, todayPlan, yesterdayTask, currentStatus, todayPlan, yesterdayTask, currentStatus]
+       check_in_time = NOW(), today_plan = ?, yesterday_task = ?, current_status = ?, work_from = ?`,
+      [employeeId, today, todayPlan, yesterdayTask, currentStatus, workFrom, todayPlan, yesterdayTask, currentStatus, workFrom]
     );
     return result;
   }

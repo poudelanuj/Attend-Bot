@@ -547,9 +547,13 @@ export default function EmployeeDetail() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-in</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check-out</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rating</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Today's Plan</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work From</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feeling</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Accomplishments</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Blockers</th>
                 </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -564,6 +568,10 @@ export default function EmployeeDetail() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {record.check_out_time ? formatTime(record.check_out_time) : '-'}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {record.check_in_time && record.check_out_time ? 
+                          `${Math.round((new Date(record.check_out_time).getTime() - new Date(record.check_in_time).getTime()) / (1000 * 60 * 60) * 10) / 10}h` : '-'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {record.overall_rating ? (
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRatingColor(record.overall_rating)}`}>
@@ -572,14 +580,29 @@ export default function EmployeeDetail() {
                         ) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <span className="truncate max-w-xs block">
-                        {record.current_status || '-'}
-                      </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          record.work_from === 'office' ? 'text-blue-600 bg-blue-100' : 'text-green-600 bg-green-100'
+                        }`}>
+                          {record.work_from || '-'}
+                        </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                      <span className="truncate max-w-xs block">
-                        {record.today_plan || '-'}
-                      </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {record.current_status || '-'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                        <span className="truncate block" title={record.today_plan}>
+                          {record.today_plan || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                        <span className="truncate block" title={record.accomplishments}>
+                          {record.accomplishments || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
+                        <span className="truncate block" title={record.blockers}>
+                          {record.blockers || '-'}
+                        </span>
                       </td>
                     </tr>
                 ))}

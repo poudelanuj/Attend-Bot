@@ -52,14 +52,13 @@ client.once('ready', async () => {
 
 import cron from 'node-cron';
 
-// 9:55 AM NPT Check-in DM (Mon–Fri)
+// 9:55 AM NPT Check-in DM (Mon–Fri, excluding Saturday)
 cron.schedule('55 9 * * 1-5', async () => {
     try {
-        console.log("its running")
+        console.log("Check-in reminder running at 9:55 AM NPT")
         const guild = await client.guilds.fetch(process.env.GUILD_ID);
         const members = await guild.members.fetch();
-        const usernames = members.map(m => m.user.tag);
-        console.log(usernames)
+        
         members.forEach(async (member) => {
             if (!member.user.bot) {
                 try {
@@ -77,9 +76,10 @@ cron.schedule('55 9 * * 1-5', async () => {
     timezone: 'Asia/Kathmandu'
 });
 
-// 4:55 PM NPT Check-out DM (Mon–Fri)
-cron.schedule('55 16 * * 1-5', async () => {
+// 4:55 PM NPT Check-out DM (Mon–Fri, excluding Sunday)
+cron.schedule('55 16 * * 1-6', async () => {
     try {
+        console.log("Check-out reminder running at 4:55 PM NPT")
         const guild = await client.guilds.fetch(process.env.GUILD_ID);
         const members = await guild.members.fetch();
 
@@ -147,16 +147,24 @@ async function handleCheckIn(interaction) {
 
     const statusInput = new TextInputBuilder()
         .setCustomId('current_status')
-        .setLabel('Current Status/Mood')
+        .setLabel('How are you feeling today?')
         .setStyle(TextInputStyle.Short)
-        .setPlaceholder('e.g., Energetic, Focused, Tired, Motivated...')
+        .setPlaceholder('Select: Excellent, Good, Okay, Tired, Stressed, Sick, Motivated')
+        .setRequired(true);
+
+    const workFromInput = new TextInputBuilder()
+        .setCustomId('work_from')
+        .setLabel('Work From')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Enter: office or remote')
         .setRequired(true);
 
     const firstActionRow = new ActionRowBuilder().addComponents(todayPlanInput);
     const secondActionRow = new ActionRowBuilder().addComponents(yesterdayTaskInput);
     const thirdActionRow = new ActionRowBuilder().addComponents(statusInput);
+    const fourthActionRow = new ActionRowBuilder().addComponents(workFromInput);
 
-    modal.addComponents(firstActionRow, secondActionRow, thirdActionRow);
+    modal.addComponents(firstActionRow, secondActionRow, thirdActionRow, fourthActionRow);
 
     await interaction.showModal(modal);
 }
@@ -166,6 +174,26 @@ async function processCheckIn(interaction) {
         const todayPlan = interaction.fields.getTextInputValue('today_plan');
         const yesterdayTask = interaction.fields.getTextInputValue('yesterday_task');
         const currentStatus = interaction.fields.getTextInputValue('current_status');
+        const workFrom = interaction.fields.getTextInputValue('work_from');
+
+        // Validate feeling input
+        const validFeelings = ['excellent', 'good', 'okay', 'tired', 'stressed', 'sick', 'motivated'];
+        if (!validFeelings.includes(currentStatus.toLowerCase())) {
+            await interaction.reply({
+                content: '❌ Please enter a valid feeling: Excellent, Good, Okay, Tired, Stressed, Sick, or Motivated',
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Validate work from input
+        if (!['office', 'remote'].includes(workFrom.toLowerCase())) {
+            await interaction.reply({
+                content: '❌ Please enter either "office" or "remote" for work location',
+                ephemeral: true
+            });
+            return;
+        }
 
         let employee = await Employee.findByDiscordId(interaction.user.id);
         if (!employee) {
@@ -183,7 +211,8 @@ async function processCheckIn(interaction) {
         await Attendance.checkIn(employee.id, {
             todayPlan,
             yesterdayTask,
-            currentStatus
+            currentStatus,
+            workFrom: workFrom.toLowerCase()
         });
 
         const embed = new EmbedBuilder()
@@ -193,7 +222,8 @@ async function processCheckIn(interaction) {
             .addFields(
                 {name: '🎯 Today\'s Plan', value: todayPlan, inline: false},
                 {name: '📋 Yesterday\'s Task', value: yesterdayTask, inline: false},
-                {name: '💭 Current Status', value: currentStatus, inline: false}
+                {name: '💭 Feeling Today', value: currentStatus, inline: true},
+                {name: '🏢 Work From', value: workFrom.charAt(0).toUpperCase() + workFrom.slice(1), inline: true}
             )
             .setTimestamp()
             .setFooter({text: 'Have a productive day!'});
