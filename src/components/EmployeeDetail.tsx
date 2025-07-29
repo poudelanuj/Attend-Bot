@@ -37,9 +37,11 @@ interface EmployeeStats {
 
 interface AttendanceData {
   [date: string]: {
-    hasCheckin: boolean;
-    hasCheckout: boolean;
+    type: 'attendance' | 'leave';
+    hasCheckin?: boolean;
+    hasCheckout?: boolean;
     rating?: number;
+    description?: string;
   };
 }
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
@@ -50,13 +52,15 @@ export default function EmployeeDetail() {
   const [attendanceHistory, setAttendanceHistory] = useState<AttendanceRecord[]>([]);
   const [stats, setStats] = useState<EmployeeStats | null>(null);
   const [attendanceData, setAttendanceData] = useState<AttendanceData>({});
+  const [holidays, setHolidays] = useState<{ [date: string]: any }>({});
+  const [projectStartDate, setProjectStartDate] = useState<string>('');
   const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredCell, setHoveredCell] = useState<{
     employeeId: number;
     date: string;
-    level: number;
-    attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number };
+    type: string;
+    data: any;
   } | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -74,7 +78,10 @@ export default function EmployeeDetail() {
       setEmployee(employeeRes.data.employee);
       setAttendanceHistory(employeeRes.data.attendanceHistory);
       setStats(employeeRes.data.stats);
-      setAttendanceData(matrixRes.data[parseInt(id!)] || {});
+      const matrixData = matrixRes.data;
+      setAttendanceData(matrixData.attendance[parseInt(id!)] || {});
+      setHolidays(matrixData.holidays);
+      setProjectStartDate(matrixData.projectStartDate);
 
       // Generate monthly stats
       const monthlyData = generateMonthlyStats(employeeRes.data.attendanceHistory);
@@ -144,21 +151,54 @@ export default function EmployeeDetail() {
         const dateStr = dayDate.toISOString().split('T')[0];
         const attendance = attendanceData[dateStr];
 
-        let level = 0;
-        if (attendance) {
-          if (attendance.hasCheckin && attendance.hasCheckout) {
-            if (attendance.rating && attendance.rating >= 5) level = 4;
-            else if (attendance.rating && attendance.rating >= 4) level = 3;
-            else level = 2;
+        const today = new Date().toISOString().split('T')[0];
+        const cellDate = new Date(dayDate);
+        const projectStart = new Date(projectStartDate);
+        
+        let cellData = { type: 'no-activity', color: 'bg-gray-100' };
+        
+        // Future dates
+        if (dayData.dateStr > today) {
+          cellData = { type: 'future', color: 'bg-gray-100' };
+        }
+        // Before project start
+        else if (cellDate < projectStart) {
+          cellData = { type: 'before-project', color: 'bg-gray-100' };
+        }
+        // Check if it's a holiday
+        else if (holidays[dayData.dateStr]) {
+          const holiday = holidays[dayData.dateStr];
+          if (holiday.name === 'Saturday') {
+            cellData = { type: 'saturday', color: 'bg-gray-200' };
+          } else {
+            cellData = { type: 'holiday', color: 'bg-purple-300' };
+          }
+        }
+        // Check attendance/leave data
+        else if (attendance) {
+          if (attendance.type === 'leave') {
+            cellData = { type: 'leave', color: 'bg-blue-300' };
+          } else if (attendance.hasCheckin && attendance.hasCheckout) {
+            if (attendance.rating && attendance.rating >= 5) {
+              cellData = { type: 'excellent', color: 'bg-green-600' };
+            } else if (attendance.rating && attendance.rating >= 4) {
+              cellData = { type: 'good', color: 'bg-green-400' };
+            } else {
+              cellData = { type: 'completed', color: 'bg-green-200' };
+            }
           } else if (attendance.hasCheckin || attendance.hasCheckout) {
-            level = 1;
+            cellData = { type: 'partial', color: 'bg-green-100' };
+          }
+        } else {
+          cellData = { type: 'no-activity', color: 'bg-red-300' };
+        }
           }
         }
 
         week.push({
           date: dayDate,
           dateStr,
-          level,
+          cellData,
           isCurrentYear: dayDate.getFullYear() === year,
           month: dayDate.getMonth()
         });
@@ -627,7 +667,7 @@ export default function EmployeeDetail() {
                   transform: mousePosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none'
                 }}
             >
-              {getLevelTooltip(hoveredCell.level, hoveredCell.date)}
+              {getTooltip(hoveredCell.data, hoveredCell.date)}
             </div>
         )}
       </div>

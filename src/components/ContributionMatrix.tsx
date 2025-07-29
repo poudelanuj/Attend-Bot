@@ -352,13 +352,7 @@ export default function ContributionMatrix() {
                   transform: mousePosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none'
                 }}
             >
-              {getLevelTooltip(
-                  hoveredCell.level,
-                  hoveredCell.attendance.hasCheckin,
-                  hoveredCell.attendance.hasCheckout,
-                  hoveredCell.attendance.rating,
-                  hoveredCell.date
-              )}
+              {getTooltip(hoveredCell.type, hoveredCell.data, hoveredCell.date)}
             </div>
         )}
       </div>

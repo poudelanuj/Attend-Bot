@@ -13,6 +13,7 @@ import {
 import dotenv from 'dotenv';
 import {Employee} from '../server/models/Employee.js';
 import {Attendance} from '../server/models/Attendance.js';
+import {Leave} from '../server/models/Leave.js';
 
 dotenv.config();
 
@@ -36,6 +37,9 @@ const commands = [
     new SlashCommandBuilder()
         .setName('status')
         .setDescription('View your attendance status'),
+    new SlashCommandBuilder()
+        .setName('leave')
+        .setDescription('Apply for leave for today'),
 ].map(command => command.toJSON());
 
 // Register slash commands
@@ -112,6 +116,10 @@ client.on('interactionCreate', async (interaction) => {
         await handleCheckOut(interaction);
     } else if (commandName === 'status') {
         await handleStatus(interaction);
+    } else if (commandName === 'leave') {
+        await handleLeave(interaction);
+    } else if (commandName === 'leave') {
+        await handleLeave(interaction);
     }
 });
 
@@ -123,10 +131,51 @@ client.on('interactionCreate', async (interaction) => {
         await processCheckIn(interaction);
     } else if (interaction.customId === 'checkout_modal') {
         await processCheckOut(interaction);
+    } else if (interaction.customId === 'leave_modal') {
+        await processLeave(interaction);
+    } else if (interaction.customId === 'leave_modal') {
+        await processLeave(interaction);
     }
 });
 
 async function handleCheckIn(interaction) {
+    try {
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+        if (employee) {
+            // Check if user has applied for leave today
+            const todayLeave = await Leave.getTodayLeave(employee.id);
+            if (todayLeave) {
+                await interaction.reply({
+                    content: '❌ You have applied for leave today. You cannot check in on a leave day.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            // Check if user has applied for leave today
+            const todayLeave = await Leave.getTodayLeave(employee.id);
+            if (todayLeave) {
+                await interaction.reply({
+                    content: '❌ You have applied for leave today. You cannot check in on a leave day.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            // Check if user already checked in today
+            const todayAttendance = await Attendance.getTodayAttendance(employee.id);
+            if (todayAttendance && todayAttendance.check_in_time) {
+                await interaction.reply({
+                    content: '❌ You have already checked in today. You can only check in once per day.',
+                    ephemeral: true
+                });
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error checking leave/attendance status:', error);
+    }
+
     const modal = new ModalBuilder()
         .setCustomId('checkin_modal')
         .setTitle('Daily Check-in');
@@ -252,6 +301,16 @@ async function handleCheckOut(interaction) {
         const employee = await Employee.findByDiscordId(interaction.user.id);
         if (!employee) {
             await interaction.reply({content: '❌ Please check in first before checking out.', ephemeral: true});
+            return;
+        }
+
+        // Check if user has applied for leave today
+        const todayLeave = await Leave.getTodayLeave(employee.id);
+        if (todayLeave) {
+            await interaction.reply({
+                content: '❌ You have applied for leave today. You cannot check out on a leave day.',
+                ephemeral: true
+            });
             return;
         }
 
@@ -409,6 +468,89 @@ Average rating: ${formattedRating}/5`,
     }
 }
 
+async function handleLeave(interaction) {
+    try {
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+        if (!employee) {
+            // Create employee if doesn't exist
+            await Employee.create({
+                discordId: interaction.user.id,
+                username: interaction.user.username,
+                displayName: interaction.user.displayName || interaction.user.username,
+                email: null,
+                department: null,
+                position: null
+            });
+        }
+
+        // Check if already applied for leave today
+        const todayLeave = await Leave.getTodayLeave(employee?.id || (await Employee.findByDiscordId(interaction.user.id)).id);
+        if (todayLeave) {
+            await interaction.reply({
+                content: '❌ You have already applied for leave today.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Check if already checked in or out today
+        const empId = employee?.id || (await Employee.findByDiscordId(interaction.user.id)).id;
+        const todayAttendance = await Attendance.getTodayAttendance(empId);
+        if (todayAttendance && (todayAttendance.check_in_time || todayAttendance.check_out_time)) {
+            await interaction.reply({
+                content: '❌ Cannot apply for leave after check-in or check-out.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId('leave_modal')
+            .setTitle('Apply for Leave');
+
+        const descriptionInput = new TextInputBuilder()
+            .setCustomId('leave_description')
+            .setLabel('Reason for leave')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Please describe the reason for your leave...')
+            .setRequired(true);
+
+        const actionRow = new ActionRowBuilder().addComponents(descriptionInput);
+        modal.addComponents(actionRow);
+
+        await interaction.showModal(modal);
+    } catch (error) {
+        console.error('Leave application error:', error);
+        await interaction.reply({ content: '❌ Error processing leave application. Please try again.', ephemeral: true });
+    }
+}
+
+async function processLeave(interaction) {
+    try {
+        const description = interaction.fields.getTextInputValue('leave_description');
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+
+        await Leave.applyLeave(employee.id, description);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x3498db)
+            .setTitle('🏖️ Leave Application Successful!')
+            .setDescription('Your leave has been recorded for today.')
+            .addFields(
+                { name: '📝 Reason', value: description, inline: false },
+                { name: '📅 Date', value: new Date().toLocaleDateString(), inline: true }
+            )
+            .setTimestamp()
+            .setFooter({ text: 'Take care and rest well!' });
+
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+    } catch (error) {
+        console.error('Leave processing error:', error);
+        await interaction.reply({ 
+            content: `❌ ${error.message}`, 
+            ephemeral: true 
+        });
+    }
+}
+
 client.login(process.env.DISCORD_TOKEN);
-
-
