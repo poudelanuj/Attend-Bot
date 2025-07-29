@@ -3,6 +3,7 @@ import { Calendar, Users, TrendingUp, ArrowLeft, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
+import { ProjectSettings } from '../types/ProjectSettings';
 
 interface Employee {
   id: number;
@@ -16,20 +17,26 @@ interface AttendanceData {
       hasCheckin: boolean;
       hasCheckout: boolean;
       rating?: number;
+      isLeave?: boolean;
+      leaveDescription?: string;
     };
   };
 }
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
+
 export default function ContributionMatrix() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceData>({});
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [hoveredCell, setHoveredCell] = useState<{
     employeeId: number;
     date: string;
     level: number;
-    attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number }
+    attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number; isLeave?: boolean; leaveDescription?: string };
   } | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const navigate = useNavigate();
@@ -44,12 +51,17 @@ export default function ContributionMatrix() {
 
   const fetchData = async () => {
     try {
-      const [employeesRes, attendanceRes] = await Promise.all([
+      const [employeesRes, attendanceRes, holidaysRes, settingsRes] = await Promise.all([
         axios.get(`${API_URL}/api/employees`),
-        axios.get(`${API_URL}/api/attendance/matrix?year=${selectedYear}`)
+        axios.get(`${API_URL}/api/attendance/matrix?year=${selectedYear}`),
+        axios.get(`${API_URL}/api/holidays`),
+        axios.get(`${API_URL}/api/settings`),
       ]);
       setEmployees(employeesRes.data);
-      setAttendanceData(attendanceRes.data);
+      setAttendanceData(attendanceRes.data.attendance);
+      // Normalize holiday dates to YYYY-MM-DD
+      setHolidays(holidaysRes.data);
+      setProjectSettings({ start_date: settingsRes.data.setting_value });
     } catch (error) {
       console.error('Error fetching matrix data:', error);
     } finally {
@@ -78,14 +90,14 @@ export default function ContributionMatrix() {
           dateStr: dayDate.toISOString().split('T')[0],
           isCurrentYear: dayDate.getFullYear() === year,
           month: dayDate.getMonth(),
-          day: dayDate.getDate()
+          day: dayDate.getDate(),
         });
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
       weeks.push({
         weekStart: weekStart,
-        days: week
+        days: week,
       });
 
       if (weekStart.getFullYear() > year) break;
@@ -96,34 +108,83 @@ export default function ContributionMatrix() {
 
   const getContributionLevel = (employeeId: number, date: string): number => {
     const attendance = attendanceData[employeeId]?.[date];
-    if (!attendance) return 0;
+    const dateObj = new Date(date);
+    const today = new Date();
+    const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+
+    // Future dates or before project start date
+    if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) return 0;
+
+    // Check if it's a holiday (Saturday)
+    const isHoliday = holidays.some((holiday) => holiday.date === date);
+    const isSaturday = dateObj.getDay() === 6;
+
+    if (isHoliday || isSaturday) {
+      return 6; // Gray for Saturdays/holidays
+    }
+
+    if (!attendance) return 8; // No activity on a working day
+
+    if (attendance.isLeave) return 7; // Blue for leave
+
     if (attendance.hasCheckin && attendance.hasCheckout) {
       if (attendance.rating) {
-        if (attendance.rating >= 5) return 4;
-        if (attendance.rating >= 4) return 3;
-        return 2;
+        if (attendance.rating >= 5) return 4; // Dark green for rating 5
+        if (attendance.rating >= 4) return 3; // Medium green for rating 4
+        return 2; // Light green for check-in + check-out
       }
       return 2;
     } else if (attendance.hasCheckin || attendance.hasCheckout) {
-      return 1;
+      return 1; // Lightest green for partial attendance
     }
-    return 0;
+
+    return 8; // Red for no activity on a working day
   };
 
   const getLevelColor = (level: number): string => {
     const colors = {
-      0: 'bg-gray-100',
-      1: 'bg-green-100',
-      2: 'bg-green-200',
-      3: 'bg-green-400',
-      4: 'bg-green-600'
+      0: 'bg-gray-100', // Future or pre-project
+      1: 'bg-green-100', // Partial attendance
+      2: 'bg-green-200', // Check-in + check-out
+      3: 'bg-green-400', // Rating 4
+      4: 'bg-green-600', // Rating 5
+      6: 'bg-gray-200', // Saturday/holiday
+      7: 'bg-blue-400', // Leave
+      8: 'bg-red-400', // No activity on working day
     };
     return colors[level] || colors[0];
   };
 
-  const getLevelTooltip = (level: number, hasCheckin: boolean, hasCheckout: boolean, rating: number | undefined, dateStr: string): string => {
+  const getLevelTooltip = (
+      level: number,
+      hasCheckin: boolean,
+      hasCheckout: boolean,
+      rating: number | undefined,
+      dateStr: string,
+      isLeave?: boolean,
+      leaveDescription?: string
+  ): string => {
     const date = new Date(dateStr).toLocaleDateString();
+    const dateObj = new Date(dateStr);
+    const today = new Date();
+    const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+
+    if (dateObj > today) return `${date}: Future date`;
+    if (projectStartDate && dateObj < projectStartDate) return `${date}: Before project start`;
+
+    const holiday = holidays.find((h) => h.date === dateStr);
+    const isSaturday = dateObj.getDay() === 6;
+
+    if (holiday || isSaturday) {
+      return `${date}: Saturday (Holiday)${holiday?.description ? ` - ${holiday.description}` : ''}`;
+    }
+
+    if (isLeave) {
+      return `${date}: On Leave${leaveDescription ? ` - ${leaveDescription}` : ''}`;
+    }
+
     if (level === 0) return `${date}: No activity`;
+    if (level === 8) return `${date}: No activity (Working day)`;
     if (level === 1) {
       if (hasCheckin && !hasCheckout) return `${date}: Check-in only`;
       if (hasCheckout && !hasCheckin) return `${date}: Check-out only`;
@@ -139,10 +200,13 @@ export default function ContributionMatrix() {
 
   const totalEmployees = employees.length;
   const totalActiveDays = Object.values(attendanceData).reduce((total, empData) => {
-    return total + Object.keys(empData).filter(date => {
-      const dateObj = new Date(date);
-      return dateObj.getFullYear() === selectedYear && (empData[date].hasCheckin || empData[date].hasCheckout);
-    }).length;
+    return (
+        total +
+        Object.keys(empData).filter((date) => {
+          const dateObj = new Date(date);
+          return dateObj.getFullYear() === selectedYear && (empData[date].hasCheckin || empData[date].hasCheckout);
+        }).length
+    );
   }, 0);
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -171,7 +235,11 @@ export default function ContributionMatrix() {
               >
                 {[...Array(3)].map((_, i) => {
                   const year = new Date().getFullYear() - i;
-                  return <option key={year} value={year}>{year}</option>;
+                  return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                  );
                 })}
               </select>
               <button onClick={logout} className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900">
@@ -213,18 +281,19 @@ export default function ContributionMatrix() {
           </div>
 
           {employees.map((employee) => {
-            const employeeActiveDays = Object.keys(attendanceData[employee.id] || {}).filter(date => {
+            const employeeActiveDays = Object.keys(attendanceData[employee.id] || {}).filter((date) => {
               const dateObj = new Date(date);
-              return dateObj.getFullYear() === selectedYear && (attendanceData[employee.id][date].hasCheckin || attendanceData[employee.id][date].hasCheckout);
+              return (
+                  dateObj.getFullYear() === selectedYear &&
+                  (attendanceData[employee.id][date].hasCheckin || attendanceData[employee.id][date].hasCheckout)
+              );
             }).length;
 
             return (
                 <div key={employee.id} className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h2 className="text-xl font-bold text-gray-900">
-                        {employee.display_name || employee.username}
-                      </h2>
+                      <h2 className="text-xl font-bold text-gray-900">{employee.display_name || employee.username}</h2>
                       <p className="text-sm text-gray-600">@{employee.username}</p>
                       <p className="text-sm text-gray-500 mt-1">
                         {employeeActiveDays} days active in {selectedYear}
@@ -247,12 +316,12 @@ export default function ContributionMatrix() {
                     <div className="inline-block min-w-full">
                       <div className="flex mb-2 ml-[80px]">
                         {months.map((month, monthIndex) => {
-                          const monthWeeks = yearGrid.filter(week => {
+                          const monthWeeks = yearGrid.filter((week) => {
                             const midWeek = new Date(week.weekStart);
                             midWeek.setDate(midWeek.getDate() + 3);
                             return midWeek.getMonth() === monthIndex && midWeek.getFullYear() === selectedYear;
                           });
-                          const weeksWidth = monthWeeks.length * 14; // 14px per week
+                          const weeksWidth = monthWeeks.length * 14;
                           if (monthWeeks.length === 0) return <div key={monthIndex} className="w-4"></div>;
 
                           return (
@@ -270,7 +339,11 @@ export default function ContributionMatrix() {
                       <div className="flex">
                         <div className="flex flex-col pr-4">
                           {dayLabels.map((day, index) => (
-                              <div key={index} className="h-[12px] mb-[2px] flex items-center justify-end" style={{ width: '40px' }}>
+                              <div
+                                  key={index}
+                                  className="h-[12px] mb-[2px] flex items-center justify-end"
+                                  style={{ width: '40px' }}
+                              >
                                 <span className="text-xs text-gray-600 font-medium">{day}</span>
                               </div>
                           ))}
@@ -278,28 +351,36 @@ export default function ContributionMatrix() {
 
                         <div className="flex gap-0.5">
                           {yearGrid.reduce((acc: JSX.Element[], week, weekIndex) => {
-                            const isMonthStart = week.days[0].month !== (weekIndex > 0 ? yearGrid[weekIndex - 1].days[0].month : -1);
+                            const isMonthStart =
+                                week.days[0].month !== (weekIndex > 0 ? yearGrid[weekIndex - 1].days[0].month : -1);
 
                             if (isMonthStart && weekIndex > 0) {
-                              acc.push(<div key={`spacer-${weekIndex}`} className="w-6"></div>); // Increased gap
+                              acc.push(<div key={`spacer-${weekIndex}`} className="w-6"></div>);
                             }
 
                             acc.push(
                                 <div key={weekIndex} className="flex flex-col gap-[2px]">
                                   {week.days.map((dayData, dayIndex) => {
                                     const level = dayData.isCurrentYear ? getContributionLevel(employee.id, dayData.dateStr) : 0;
-                                    const attendance = attendanceData[employee.id]?.[dayData.dateStr] || { hasCheckin: false, hasCheckout: false };
+                                    const attendance = attendanceData[employee.id]?.[dayData.dateStr] || {
+                                      hasCheckin: false,
+                                      hasCheckout: false,
+                                    };
 
                                     return (
                                         <div
                                             key={dayIndex}
-                                            className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-gray-400 ${getLevelColor(level)}`}
-                                            onMouseEnter={() => setHoveredCell({
-                                              employeeId: employee.id,
-                                              date: dayData.dateStr,
-                                              level,
-                                              attendance
-                                            })}
+                                            className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-gray-400 ${getLevelColor(
+                                                level
+                                            )}`}
+                                            onMouseEnter={() =>
+                                                setHoveredCell({
+                                                  employeeId: employee.id,
+                                                  date: dayData.dateStr,
+                                                  level,
+                                                  attendance,
+                                                })
+                                            }
                                             onMouseLeave={() => setHoveredCell(null)}
                                         />
                                     );
@@ -318,10 +399,10 @@ export default function ContributionMatrix() {
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Legend</h3>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded-sm"></div>
-                <span className="text-gray-600">No Activity</span>
+                <span className="text-gray-600">Future/Before Project Start</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-green-100 rounded-sm"></div>
@@ -333,11 +414,23 @@ export default function ContributionMatrix() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-green-400 rounded-sm"></div>
-                <span className="text-gray-600">Good Day (4+ Rating)</span>
+                <span className="text-gray-600">Good Day (Rating 4)</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-green-600 rounded-sm"></div>
-                <span className="text-gray-600">Excellent Day (5 Rating)</span>
+                <span className="text-gray-600">Excellent Day (Rating 5)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-200 rounded-sm"></div>
+                <span className="text-gray-600">Saturday (Holiday)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-blue-400 rounded-sm"></div>
+                <span className="text-gray-600">On Leave</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-red-400 rounded-sm"></div>
+                <span className="text-gray-600">No Activity (Working Day)</span>
               </div>
             </div>
           </div>
@@ -349,7 +442,7 @@ export default function ContributionMatrix() {
                 style={{
                   left: mousePosition.x + 10,
                   top: mousePosition.y - 30,
-                  transform: mousePosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none'
+                  transform: mousePosition.x > window.innerWidth - 200 ? 'translateX(-100%)' : 'none',
                 }}
             >
               {getLevelTooltip(
@@ -357,7 +450,9 @@ export default function ContributionMatrix() {
                   hoveredCell.attendance.hasCheckin,
                   hoveredCell.attendance.hasCheckout,
                   hoveredCell.attendance.rating,
-                  hoveredCell.date
+                  hoveredCell.date,
+                  hoveredCell.attendance.isLeave,
+                  hoveredCell.attendance.leaveDescription
               )}
             </div>
         )}

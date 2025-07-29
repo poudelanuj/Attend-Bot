@@ -17,6 +17,7 @@ import {
 import dotenv from 'dotenv';
 import {Employee} from '../server/models/Employee.js';
 import {Attendance} from '../server/models/Attendance.js';
+import {Leave} from '../server/models/Leave.js';
 import cron from 'node-cron';
 
 // Temporary storage for select menu choices
@@ -41,6 +42,9 @@ const commands = [
     new SlashCommandBuilder()
         .setName('checkout')
         .setDescription('Start the check-out process'),
+    new SlashCommandBuilder()
+        .setName('leave')
+        .setDescription('Apply for leave for today'),
     new SlashCommandBuilder()
         .setName('status')
         .setDescription('View your attendance status'),
@@ -114,6 +118,8 @@ client.on('interactionCreate', async (interaction) => {
             await handleCheckIn(interaction);
         } else if (commandName === 'checkout') {
             await handleCheckOut(interaction);
+        } else if (commandName === 'leave') {
+            await handleLeave(interaction);
         } else if (commandName === 'status') {
             await handleStatus(interaction);
         }
@@ -128,6 +134,8 @@ client.on('interactionCreate', async (interaction) => {
             await processCheckIn(interaction);
         } else if (interaction.customId === 'checkout_modal') {
             await processCheckOut(interaction);
+        } else if (interaction.customId === 'leave_modal') {
+            await processLeave(interaction);
         }
     }
 });
@@ -137,6 +145,16 @@ async function handleCheckIn(interaction) {
         // Check if user already checked in today
         const employee = await Employee.findByDiscordId(interaction.user.id);
         if (employee) {
+            // Check if on leave today
+            const todayLeave = await Leave.getTodayLeave(employee.id);
+            if (todayLeave) {
+                await interaction.reply({
+                    content: '❌ You are on leave today. You cannot check in.',
+                    ephemeral: true
+                });
+                return;
+            }
+
             const todayAttendance = await Attendance.getTodayAttendance(employee.id);
             if (todayAttendance && todayAttendance.check_in_time) {
                 await interaction.reply({
@@ -367,11 +385,104 @@ async function processCheckIn(interaction) {
     }
 }
 
+async function handleLeave(interaction) {
+    try {
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+        if (!employee) {
+            await Employee.create({
+                discordId: interaction.user.id,
+                username: interaction.user.username,
+                displayName: interaction.user.displayName || interaction.user.username,
+                email: null,
+                department: null,
+                position: null
+            });
+            const newEmployee = await Employee.findByDiscordId(interaction.user.id);
+            employee = newEmployee;
+        }
+
+        // Check if already applied for leave today
+        const todayLeave = await Leave.getTodayLeave(employee.id);
+        if (todayLeave) {
+            await interaction.reply({
+                content: '❌ You have already applied for leave today.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Check if already checked in or out today
+        const todayAttendance = await Attendance.getTodayAttendance(employee.id);
+        if (todayAttendance && (todayAttendance.check_in_time || todayAttendance.check_out_time)) {
+            await interaction.reply({
+                content: '❌ You cannot apply for leave after checking in or out today.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        const modal = new ModalBuilder()
+            .setCustomId('leave_modal')
+            .setTitle('Apply for Leave');
+
+        const descriptionInput = new TextInputBuilder()
+            .setCustomId('leave_description')
+            .setLabel('Leave Description')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Please provide the reason for your leave...')
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(descriptionInput)
+        );
+
+        await interaction.showModal(modal);
+    } catch (error) {
+        console.error('Leave application error:', error);
+        await interaction.reply({content: '❌ Error processing leave application. Please try again.', ephemeral: true});
+    }
+}
+
+async function processLeave(interaction) {
+    try {
+        const description = interaction.fields.getTextInputValue('leave_description');
+        const employee = await Employee.findByDiscordId(interaction.user.id);
+
+        await Leave.applyLeave(employee.id, description);
+
+        const embed = new EmbedBuilder()
+            .setColor(0x0099ff)
+            .setTitle('🏖️ Leave Applied Successfully!')
+            .setDescription('Your leave application has been recorded.')
+            .addFields(
+                {name: '📅 Date', value: new Date().toLocaleDateString(), inline: true},
+                {name: '📝 Description', value: description, inline: false}
+            )
+            .setTimestamp()
+            .setFooter({text: 'Take care and rest well!'});
+
+        await interaction.reply({embeds: [embed], ephemeral: true});
+    } catch (error) {
+        console.error('Leave processing error:', error);
+        await interaction.reply({content: '❌ Error processing leave application. Please try again.', ephemeral: true});
+    }
+}
+
 async function handleCheckOut(interaction) {
     try {
         const employee = await Employee.findByDiscordId(interaction.user.id);
         if (!employee) {
             await interaction.reply({content: '❌ Please check in first before checking out.', ephemeral: true});
+            return;
+        }
+
+        // Check if on leave today
+        const todayLeave = await Leave.getTodayLeave(employee.id);
+        if (todayLeave) {
+            await interaction.reply({
+                content: '❌ You are on leave today. You cannot check out.',
+                ephemeral: true
+            });
             return;
         }
 

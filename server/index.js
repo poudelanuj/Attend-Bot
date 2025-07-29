@@ -10,6 +10,8 @@ import employeeRoutes from './routes/employees.js';
 import analyticsRoutes from './routes/analytics.js';
 import attendanceRoutes from './routes/attendance.js';
 import holidayRoutes from './routes/holidays.js';
+import settingsRoutes from './routes/settings.js';
+import leaves from "./routes/leaves.js";
 
 dotenv.config();
 
@@ -31,6 +33,9 @@ app.use('/api/employees', authenticateToken, employeeRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
 app.use('/api/attendance', authenticateToken, attendanceRoutes);
 app.use('/api/holidays', authenticateToken, holidayRoutes);
+app.use('/api/settings', authenticateToken, settingsRoutes);
+app.use('/api/leaves', authenticateToken, leaves);
+
 
 // Health check
 app.get('/api/health', (req, res) => {
