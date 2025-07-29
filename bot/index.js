@@ -483,8 +483,8 @@ async function handleLeave(interaction) {
             });
         }
 
-        // Check if already applied for leave today
-        const todayLeave = await Leave.getTodayLeave(employee?.id || (await Employee.findByDiscordId(interaction.user.id)).id);
+        // Check if user already applied for leave today
+        const todayLeave = await Leave.getTodayLeave(employee ? employee.id : (await Employee.findByDiscordId(interaction.user.id)).id);
         if (todayLeave) {
             await interaction.reply({
                 content: '❌ You have already applied for leave today.',
@@ -493,12 +493,11 @@ async function handleLeave(interaction) {
             return;
         }
 
-        // Check if already checked in or out today
-        const empId = employee?.id || (await Employee.findByDiscordId(interaction.user.id)).id;
-        const todayAttendance = await Attendance.getTodayAttendance(empId);
+        // Check if user has already checked in or out today
+        const todayAttendance = await Attendance.getTodayAttendance(employee ? employee.id : (await Employee.findByDiscordId(interaction.user.id)).id);
         if (todayAttendance && (todayAttendance.check_in_time || todayAttendance.check_out_time)) {
             await interaction.reply({
-                content: '❌ Cannot apply for leave after check-in or check-out.',
+                content: '❌ You cannot apply for leave after checking in or out. Leave must be applied before any attendance activity.',
                 ephemeral: true
             });
             return;
@@ -512,45 +511,10 @@ async function handleLeave(interaction) {
             .setCustomId('leave_description')
             .setLabel('Reason for leave')
             .setStyle(TextInputStyle.Paragraph)
-            .setPlaceholder('Please describe the reason for your leave...')
-            .setRequired(true);
-
-        const actionRow = new ActionRowBuilder().addComponents(descriptionInput);
-        modal.addComponents(actionRow);
-
-        await interaction.showModal(modal);
-    } catch (error) {
-        console.error('Leave application error:', error);
-        await interaction.reply({ content: '❌ Error processing leave application. Please try again.', ephemeral: true });
-    }
-}
-
-async function processLeave(interaction) {
-    try {
-        const description = interaction.fields.getTextInputValue('leave_description');
-        const employee = await Employee.findByDiscordId(interaction.user.id);
-
-        await Leave.applyLeave(employee.id, description);
-
-        const embed = new EmbedBuilder()
-            .setColor(0x3498db)
-            .setTitle('🏖️ Leave Application Successful!')
-            .setDescription('Your leave has been recorded for today.')
-            .addFields(
-                { name: '📝 Reason', value: description, inline: false },
-                { name: '📅 Date', value: new Date().toLocaleDateString(), inline: true }
-            )
-            .setTimestamp()
-            .setFooter({ text: 'Take care and rest well!' });
-
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-    } catch (error) {
-        console.error('Leave processing error:', error);
-        await interaction.reply({ 
-            content: `❌ ${error.message}`, 
-            ephemeral: true 
-        });
+            .setPlaceholder('Please describe the reason for your leave today...')
     }
 }
 
 client.login(process.env.DISCORD_TOKEN);
+
+
