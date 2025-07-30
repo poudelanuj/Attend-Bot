@@ -26,13 +26,15 @@ router.get('/kpis', async (req, res) => {
         COUNT(DISTINCT e.id) as total_employees,
         COUNT(DISTINCT CASE WHEN a.check_in_time IS NOT NULL THEN a.employee_id END) as today_checkins,
         COUNT(DISTINCT CASE WHEN a.check_out_time IS NOT NULL THEN a.employee_id END) as today_checkouts,
+        COUNT(DISTINCT l.employee_id) as today_leaves,
         AVG(a.overall_rating) as today_avg_rating,
         AVG(CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
             THEN TIMESTAMPDIFF(HOUR, a.check_in_time, a.check_out_time) END) as today_avg_hours
       FROM employees e
       LEFT JOIN attendance a ON e.id = a.employee_id AND DATE(a.date) = ?
+      LEFT JOIN leaves l ON e.id = l.employee_id AND DATE(l.date) = ?
       WHERE e.is_active = 1
-    `, [today]);
+    `, [today, today]);
 
     // This month's KPIs
     const [monthStats] = await pool.execute(`
@@ -40,12 +42,15 @@ router.get('/kpis', async (req, res) => {
         COUNT(DISTINCT a.employee_id) as active_employees,
         COUNT(DISTINCT CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
               THEN CONCAT(a.employee_id, '-', a.date) END) as completed_days,
+        COUNT(DISTINCT l.employee_id) as employees_on_leave,
+        COUNT(DISTINCT CONCAT(l.employee_id, '-', l.date)) as total_leave_days,
         AVG(a.overall_rating) as month_avg_rating,
         AVG(CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
             THEN TIMESTAMPDIFF(HOUR, a.check_in_time, a.check_out_time) END) as month_avg_hours
       FROM attendance a
+      LEFT JOIN leaves l ON DATE_FORMAT(l.date, '%Y-%m') = ?
       WHERE DATE_FORMAT(a.date, '%Y-%m') = ?
-    `, [thisMonth]);
+    `, [thisMonth, thisMonth]);
 
     // This year's KPIs
     const [yearStats] = await pool.execute(`
@@ -53,12 +58,15 @@ router.get('/kpis', async (req, res) => {
         COUNT(DISTINCT a.employee_id) as active_employees,
         COUNT(DISTINCT CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
               THEN CONCAT(a.employee_id, '-', a.date) END) as completed_days,
+        COUNT(DISTINCT l.employee_id) as employees_on_leave,
+        COUNT(DISTINCT CONCAT(l.employee_id, '-', l.date)) as total_leave_days,
         AVG(a.overall_rating) as year_avg_rating,
         AVG(CASE WHEN a.check_in_time IS NOT NULL AND a.check_out_time IS NOT NULL 
             THEN TIMESTAMPDIFF(HOUR, a.check_in_time, a.check_out_time) END) as year_avg_hours
       FROM attendance a
+      LEFT JOIN leaves l ON YEAR(l.date) = ?
       WHERE YEAR(a.date) = ?
-    `, [thisYear]);
+    `, [thisYear, thisYear]);
 
     res.json({
       today: todayStats[0],
@@ -128,4 +136,41 @@ router.get('/checkin-status', async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+router.get('/employee-leave-summary', async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    
+    // Get annual leave config
+    const [configRows] = await pool.execute(
+      'SELECT setting_value FROM project_settings WHERE setting_key = "annual_leave_days"'
+    );
+    const annualLeaveAllocation = configRows[0] ? parseInt(configRows[0].setting_value) : 20;
+
+    // Get leave usage per employee
+    const [leaveUsage] = await pool.execute(`
+      SELECT 
+        e.id,
+        e.username,
+        e.display_name,
+        COUNT(l.id) as leaves_taken,
+        ? - COUNT(l.id) as leaves_remaining
+      FROM employees e
+      LEFT JOIN leaves l ON e.id = l.employee_id AND YEAR(l.date) = ?
+      WHERE e.is_active = 1
+      GROUP BY e.id, e.username, e.display_name
+      ORDER BY e.username
+    `, [annualLeaveAllocation, currentYear]);
+
+    res.json({
+      annualLeaveAllocation,
+      currentYear,
+      employees: leaveUsage
+    });
+  } catch (error) {
+    console.error('Error fetching employee leave summary:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 export default router;
