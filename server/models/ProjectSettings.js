@@ -10,7 +10,7 @@ export class ProjectSettings {
 
   static async updateStartDate(startDate) {
     const [existing] = await pool.execute('SELECT id FROM project_settings WHERE setting_key = "project_start_date" LIMIT 1');
-    
+
     if (existing.length > 0) {
       const [result] = await pool.execute(
         'UPDATE project_settings SET setting_value = ?, updated_at = NOW() WHERE id = ?',
@@ -33,9 +33,16 @@ export class ProjectSettings {
     return rows[0] ? parseInt(rows[0].setting_value) : 14; // Default 14 days
   }
 
+  static async getProjectStartDate() {
+    const [rows] = await pool.execute(
+        'SELECT setting_value FROM project_settings WHERE setting_key = "project_start_date"'
+    );
+    return rows[0] ? rows[0].setting_value : '2025-01-01'; // Default 14 days
+  }
+
   static async updateAnnualLeaveConfig(days) {
     const [existing] = await pool.execute('SELECT id FROM project_settings WHERE setting_key = "annual_leave_days" LIMIT 1');
-    
+
     if (existing.length > 0) {
       const [result] = await pool.execute(
         'UPDATE project_settings SET setting_value = ?, updated_at = NOW() WHERE id = ?',
@@ -50,7 +57,7 @@ export class ProjectSettings {
       return result;
     }
   }
-  
+
   static async getAnnualLeaveResetDate() {
     const [rows] = await pool.execute(
       'SELECT setting_value FROM project_settings WHERE setting_key = "annual_leave_reset_date"'
@@ -64,9 +71,9 @@ export class ProjectSettings {
     if (!dateRegex.test(resetDate)) {
       throw new Error('Invalid date format. Use MM-DD format.');
     }
-    
+
     const [existing] = await pool.execute('SELECT id FROM project_settings WHERE setting_key = "annual_leave_reset_date" LIMIT 1');
-    
+
     if (existing.length > 0) {
       const [result] = await pool.execute(
         'UPDATE project_settings SET setting_value = ?, updated_at = NOW() WHERE id = ?',

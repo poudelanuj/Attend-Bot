@@ -61,7 +61,11 @@ export default function ContributionMatrix() {
       setAttendanceData(attendanceRes.data.attendance);
       // Normalize holiday dates to YYYY-MM-DD
       setHolidays(holidaysRes.data);
-      setProjectSettings({ start_date: settingsRes.data.setting_value });
+      // Fix: Use the correct property name from API response
+      setProjectSettings({
+        start_date: settingsRes.data.projectStartDate,
+        projectStartDate: settingsRes.data.projectStartDate
+      });
     } catch (error) {
       console.error('Error fetching matrix data:', error);
     } finally {
@@ -110,35 +114,38 @@ export default function ContributionMatrix() {
     const attendance = attendanceData[employeeId]?.[date];
     const dateObj = new Date(date);
     const today = new Date();
-    const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+    // Fix: Use the correct property name
+    const projectStartDate = projectSettings?.projectStartDate ? new Date(projectSettings.projectStartDate) : null;
 
-    // Future dates or before project start date
-    if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) return 0;
+    // Exclude future dates or dates before project start
+    if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) {
+      return 0; // Default gray
+    }
 
-    // Check if it's a holiday (Saturday)
+    // Check for weekends or listed holidays
     const isHoliday = holidays.some((holiday) => holiday.date === date);
     const isSaturday = dateObj.getDay() === 6;
 
     if (isHoliday || isSaturday) {
-      return 6; // Gray for Saturdays/holidays
+      return 6; // Gray for holiday or Saturday
     }
 
-    if (!attendance) return 8; // No activity on a working day
+    if (!attendance) return 8; // Red for no data on working day
 
     if (attendance.isLeave) return 7; // Blue for leave
 
     if (attendance.hasCheckin && attendance.hasCheckout) {
       if (attendance.rating) {
-        if (attendance.rating >= 5) return 4; // Dark green for rating 5
-        if (attendance.rating >= 4) return 3; // Medium green for rating 4
-        return 2; // Light green for check-in + check-out
+        if (attendance.rating >= 5) return 4; // Dark green
+        if (attendance.rating >= 4) return 3; // Medium green
+        return 2; // Light green
       }
-      return 2;
+      return 2; // Default check-in/out without rating
     } else if (attendance.hasCheckin || attendance.hasCheckout) {
-      return 1; // Lightest green for partial attendance
+      return 1; // Lightest green: partial attendance
     }
 
-    return 8; // Red for no activity on a working day
+    return 8; // Red: no check-in, no leave
   };
 
   const getLevelColor = (level: number): string => {
@@ -167,7 +174,8 @@ export default function ContributionMatrix() {
     const date = new Date(dateStr).toLocaleDateString();
     const dateObj = new Date(dateStr);
     const today = new Date();
-    const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+    // Fix: Use the correct property name
+    const projectStartDate = projectSettings?.projectStartDate ? new Date(projectSettings.projectStartDate) : null;
 
     if (dateObj > today) return `${date}: Future date`;
     if (projectStartDate && dateObj < projectStartDate) return `${date}: Before project start`;

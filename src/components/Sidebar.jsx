@@ -5,42 +5,42 @@ import '../styles/sidebar.css';
 const Sidebar = () => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  
+
   useEffect(() => {
     // Close sidebar when route changes on mobile
     setIsSidebarOpen(false);
-    
+
     // Handle outside clicks for mobile
     function handleClickOutside(event) {
       const sidebarElement = document.querySelector('.sidebar');
       const toggleButton = document.querySelector('.sidebar-toggle');
-      
+
       if (
         isSidebarOpen &&
-        sidebarElement && 
+        sidebarElement &&
         !sidebarElement.contains(event.target) &&
-        toggleButton && 
+        toggleButton &&
         !toggleButton.contains(event.target)
       ) {
         setIsSidebarOpen(false);
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [location.pathname, isSidebarOpen]);
-  
+
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
-  
+
   return (
     <>
       {/* Mobile Toggle Button */}
-      <button 
-        className="sidebar-toggle" 
+      <button
+        className="sidebar-toggle"
         onClick={toggleSidebar}
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +49,7 @@ const Sidebar = () => {
           <line x1="3" y1="18" x2="21" y2="18"></line>
         </svg>
       </button>
-    
+
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -59,7 +59,7 @@ const Sidebar = () => {
           </svg>
           <h1>AttendBot</h1>
         </div>
-        
+
         <nav className="sidebar-menu">
           <ul>
             <li>
@@ -94,14 +94,20 @@ const Sidebar = () => {
               </Link>
             </li>
             <li>
-              <Link to="/attendance" className={location.pathname === '/attendance' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
+              <Link to="/holidays" className={location.pathname === '/holidays' ? 'active' : ''}>
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     width="24" height="24" viewBox="0 0 24 24"
+                     fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 6.1a4 4 0 0 1 1.4 7.7" />
+                  <path d="M13 12h1l3 9" />
+                  <path d="M12 2v10" />
+                  <path d="M9 12h1l-3 9" />
+                  <path d="M4.6 13.8a4 4 0 1 1 4.9-6.3" />
+                  <path d="M12 6a4 4 0 1 0-4-4" />
                 </svg>
-                Attendance
+
+                Holiday
               </Link>
             </li>
             <li>
@@ -115,7 +121,7 @@ const Sidebar = () => {
             </li>
           </ul>
         </nav>
-        
+
         <div className="sidebar-footer">
           <button className="logout-button" onClick={() => {
             localStorage.removeItem('token');

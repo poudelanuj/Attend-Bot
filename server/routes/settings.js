@@ -8,15 +8,16 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const settings = await ProjectSettings.getSettings();
-    
+
     // Get annual leave settings
     const annualLeaveDays = await ProjectSettings.getAnnualLeaveConfig();
     const annualLeaveResetDate = await ProjectSettings.getAnnualLeaveResetDate();
-    
+    const projectStartDate = await ProjectSettings.getProjectStartDate();
     res.json({
       ...(settings || { start_date: null }),
       annualLeaveDays,
-      annualLeaveResetDate
+      annualLeaveResetDate,
+      projectStartDate
     });
   } catch (error) {
     console.error('Error fetching settings:', error);
@@ -42,11 +43,11 @@ router.put('/start-date', async (req, res) => {
 });
 
 // Update annual leave configuration
-router.put('/annual-leave', async (req, res) => {
+router.put('/', async (req, res) => {
   try {
-    const { days, resetDate } = req.body;
+    const { days, resetDate, projectStartDate } = req.body;
 
-    if (days === undefined && resetDate === undefined) {
+    if (days === undefined && resetDate === undefined && projectStartDate === undefined) {
       return res.status(400).json({ message: 'Either days or resetDate must be provided' });
     }
 
@@ -66,9 +67,17 @@ router.put('/annual-leave', async (req, res) => {
       }
     }
 
-    res.json({ message: 'Annual leave settings updated successfully' });
+    if (projectStartDate !== undefined) {
+      try {
+        await ProjectSettings.updateStartDate(projectStartDate);
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
+      }
+    }
+
+    res.json({ message: 'Settings updated successfully' });
   } catch (error) {
-    console.error('Error updating annual leave settings:', error);
+    console.error('Error updating settings:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

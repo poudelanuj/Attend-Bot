@@ -36,7 +36,7 @@ interface LeaveRecord {
     employee_id: number;
     date: string;
     description: string;
-    status: string;
+    status?: string;
 }
 
 interface EmployeeStats {
@@ -47,17 +47,21 @@ interface EmployeeStats {
 }
 
 interface AttendanceData {
-    [employeeId: number]: {
-        [date: string]: {
-            hasCheckin: boolean;
-            hasCheckout: boolean;
-            rating?: number;
-            workFrom?: string;
-            status?: string;
-            type?: string;
-            leaveDescription?: string;
-        };
+    [date: string]: {
+        type: string;
+        hasCheckin: boolean;
+        hasCheckout: boolean;
+        rating?: number;
+        workFrom?: string;
+        status?: string;
+        description?: string;
     };
+}
+
+interface Holiday {
+    date: string;
+    name: string;
+    description?: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
@@ -70,15 +74,14 @@ export default function EmployeeDetail() {
     const [leaveHistory, setLeaveHistory] = useState<LeaveRecord[]>([]);
     const [stats, setStats] = useState<EmployeeStats | null>(null);
     const [attendanceData, setAttendanceData] = useState<AttendanceData>({});
-    const [holidays, setHolidays] = useState<any[]>([]);
+    const [holidays, setHolidays] = useState<Holiday[]>([]);
     const [projectSettings, setProjectSettings] = useState<ProjectSettings | null>(null);
     const [monthlyStats, setMonthlyStats] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [hoveredCell, setHoveredCell] = useState<{
-        employeeId: number;
         date: string;
         level: number;
-        attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number; workFrom?: string; status?: string; type?: string; leaveDescription?: string };
+        attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number; workFrom?: string; status?: string; type?: string; description?: string };
     } | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -97,16 +100,46 @@ export default function EmployeeDetail() {
             ]);
 
             setEmployee(employeeRes.data.employee);
-            setAttendanceHistory(employeeRes.data.attendanceHistory);
-            setLeaveHistory(leaveRes.data);
+            setAttendanceHistory(employeeRes.data.attendanceHistory || []);
+            setLeaveHistory(leaveRes.data.leaves || []);
             setStats(employeeRes.data.stats);
-            // Map attendance data to match ContributionMatrix.tsx structure
-            setAttendanceData({ [parseInt(id!)]: matrixRes.data.attendance });
-            setHolidays(holidaysRes.data);
-            setProjectSettings({ start_date: settingsRes.data.setting_value });
 
-            // Generate monthly stats
-            const monthlyData = generateMonthlyStats(employeeRes.data.attendanceHistory, leaveRes.data);
+            // Process the attendance matrix data correctly
+            const matrixData = matrixRes.data;
+            const processedAttendanceData: AttendanceData = {};
+
+            // Process attendance data
+            if (matrixData.attendance && matrixData.attendance[id]) {
+                const employeeAttendance = matrixData.attendance[id];
+                Object.keys(employeeAttendance).forEach(date => {
+                    processedAttendanceData[date] = {
+                        ...employeeAttendance[date],
+                        hasCheckin: employeeAttendance[date].hasCheckin || false,
+                        hasCheckout: employeeAttendance[date].hasCheckout || false
+                    };
+                });
+            }
+
+            setAttendanceData(processedAttendanceData);
+
+            // Process holidays data correctly
+            const processedHolidays: Holiday[] = [];
+            if (matrixData.holidays) {
+                Object.keys(matrixData.holidays).forEach(date => {
+                    processedHolidays.push({
+                        date: date,
+                        name: matrixData.holidays[date].name,
+                        description: matrixData.holidays[date].description
+                    });
+                });
+            }
+            setHolidays(processedHolidays);
+
+            setProjectSettings({
+                projectStartDate: matrixData.projectStartDate || settingsRes.data.projectStartDate
+            });
+
+            const monthlyData = generateMonthlyStats(employeeRes.data.attendanceHistory || [], leaveRes.data.leaves || []);
             setMonthlyStats(monthlyData);
         } catch (error) {
             console.error('Error fetching employee details:', error);
@@ -119,7 +152,6 @@ export default function EmployeeDetail() {
         const monthlyMap = new Map();
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-        // Process attendance records
         attendanceRecords.forEach(record => {
             const date = new Date(record.date);
             const monthKey = `${months[date.getMonth()]} ${date.getFullYear()}`;
@@ -149,7 +181,6 @@ export default function EmployeeDetail() {
             }
         });
 
-        // Process leave records
         leaveRecords.forEach(record => {
             const date = new Date(record.date);
             const monthKey = `${months[date.getMonth()]} ${date.getFullYear()}`;
@@ -213,43 +244,48 @@ export default function EmployeeDetail() {
         return weeks;
     };
 
-    const getContributionLevel = (employeeId: number, date: string): number => {
-        const attendance = attendanceData[employeeId]?.[date];
+    const getContributionLevel = (date: string): number => {
+        const attendance = attendanceData[date];
         const dateObj = new Date(date);
         const today = new Date();
-        const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+        const projectStartDate = projectSettings?.projectStartDate ? new Date(projectSettings.projectStartDate) : null;
 
-        // Future dates or before project start date
-        if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) return 0;
+        // Future dates or before project start
+        if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) {
+            return 0; // Gray for future or pre-project
+        }
 
-        // Check if it's a holiday
-        const holiday = holidays.find((h) => h.date === date);
+        // Check if it's a holiday or Saturday
+        const isHoliday = holidays.some((holiday) => holiday.date === date);
         const isSaturday = dateObj.getDay() === 6;
 
-        if (isSaturday) {
-            return 6; // Gray for Saturday (default holiday)
+        if (isHoliday || isSaturday) {
+            return 6; // Gray for holiday or Saturday
         }
 
-        if (holiday) {
-            return 5; // Purple for other holidays
+        // No attendance data
+        if (!attendance) {
+            return 8; // Red for no data on working day
         }
 
-        if (!attendance) return 8; // No activity on a working day
+        // Check if it's a leave day
+        if (attendance.type === 'leave') {
+            return 7; // Blue for leave
+        }
 
-        if (attendance.type === 'leave') return 7; // Blue for leave
-
+        // Check attendance completion and rating
         if (attendance.hasCheckin && attendance.hasCheckout) {
             if (attendance.rating) {
-                if (attendance.rating >= 5) return 4; // Dark green for rating 5
-                if (attendance.rating >= 4) return 3; // Medium green for rating 4
-                return 2; // Light green for check-in + check-out
+                if (attendance.rating >= 5) return 4; // Dark green
+                if (attendance.rating >= 4) return 3; // Medium green
+                return 2; // Light green
             }
-            return 2;
+            return 2; // Default check-in/out without rating
         } else if (attendance.hasCheckin || attendance.hasCheckout) {
-            return 1; // Lightest green for partial attendance
+            return 1; // Lightest green: partial attendance
         }
 
-        return 8; // Red for no activity on a working day
+        return 8; // Red: no check-in, no leave
     };
 
     const getLevelColor = (level: number): string => {
@@ -274,12 +310,12 @@ export default function EmployeeDetail() {
         rating: number | undefined,
         dateStr: string,
         type?: string,
-        leaveDescription?: string
+        description?: string
     ): string => {
         const date = new Date(dateStr).toLocaleDateString();
         const dateObj = new Date(dateStr);
         const today = new Date();
-        const projectStartDate = projectSettings?.start_date ? new Date(projectSettings.start_date) : null;
+        const projectStartDate = projectSettings?.projectStartDate ? new Date(projectSettings.projectStartDate) : null;
 
         if (dateObj > today) return `${date}: Future date`;
         if (projectStartDate && dateObj < projectStartDate) return `${date}: Before project start`;
@@ -296,7 +332,7 @@ export default function EmployeeDetail() {
         }
 
         if (type === 'leave') {
-            return `${date}: On Leave${leaveDescription ? ` - ${leaveDescription}` : ''}`;
+            return `${date}: On Leave${description ? ` - ${description}` : ''}`;
         }
 
         if (level === 0) return `${date}: No activity`;
@@ -317,8 +353,12 @@ export default function EmployeeDetail() {
     };
 
     const formatTime = (dateString: string | null) => {
-        return dateString ? new Date(dateString).toLocaleTimeString() : '-';
+        if (!dateString || dateString === '-' || isNaN(Date.parse(dateString))) {
+            return '-';
+        }
+        return new Date(dateString).toLocaleTimeString();
     };
+
 
     const getRatingColor = (rating: number | null) => {
         if (rating === null) return 'text-gray-600 bg-gray-100';
@@ -331,7 +371,6 @@ export default function EmployeeDetail() {
         setMousePosition({ x: e.clientX, y: e.clientY });
     };
 
-    // Pie chart data for ratings distribution
     const ratingDistribution = [
         { name: '5 Stars', value: attendanceHistory.filter(r => r.overall_rating === 5).length, color: '#10b981' },
         { name: '4 Stars', value: attendanceHistory.filter(r => r.overall_rating === 4).length, color: '#3b82f6' },
@@ -340,7 +379,6 @@ export default function EmployeeDetail() {
         { name: '1 Star', value: attendanceHistory.filter(r => r.overall_rating === 1).length, color: '#6b7280' },
     ].filter(item => item.value > 0);
 
-    // Combine attendance and leave history for display
     const combinedHistory = [
         ...attendanceHistory.map(record => ({
             type: 'attendance',
@@ -365,7 +403,7 @@ export default function EmployeeDetail() {
             hours: '-',
             rating: null,
             work_from: '-',
-            current_status: `Leave (${record.status})`,
+            current_status: `Leave (${record.status || 'Pending'})`,
             today_plan: record.description || '-',
             accomplishments: '-',
             blockers: '-'
@@ -394,7 +432,6 @@ export default function EmployeeDetail() {
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900">
-            {/* Header */}
             <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
                     <div className="flex items-center">
@@ -413,7 +450,6 @@ export default function EmployeeDetail() {
             </header>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Employee Info */}
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
                     <div className="flex items-center mb-4">
                         <div className="h-16 w-16 rounded-full bg-gray-300 flex items-center justify-center">
@@ -445,7 +481,6 @@ export default function EmployeeDetail() {
                     </div>
                 </div>
 
-                {/* Stats Cards */}
                 {stats && (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                         <div className="bg-white rounded-xl shadow-sm p-6">
@@ -502,7 +537,6 @@ export default function EmployeeDetail() {
                     </div>
                 )}
 
-                {/* Contribution Matrix */}
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-semibold text-gray-900">Contribution Matrix ({new Date().getFullYear()})</h3>
@@ -564,8 +598,8 @@ export default function EmployeeDetail() {
                                         acc.push(
                                             <div key={weekIndex} className="flex flex-col gap-[2px]">
                                                 {week.days.map((dayData, dayIndex) => {
-                                                    const level = dayData.isCurrentYear ? getContributionLevel(employee.id, dayData.dateStr) : 0;
-                                                    const attendance = attendanceData[employee.id]?.[dayData.dateStr];
+                                                    const level = dayData.isCurrentYear ? getContributionLevel(dayData.dateStr) : 0;
+                                                    const attendance = attendanceData[dayData.dateStr];
 
                                                     return (
                                                         <div
@@ -573,7 +607,6 @@ export default function EmployeeDetail() {
                                                             className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-gray-400 ${getLevelColor(level)}`}
                                                             onMouseEnter={() =>
                                                                 setHoveredCell({
-                                                                    employeeId: employee.id,
                                                                     date: dayData.dateStr,
                                                                     level,
                                                                     attendance: attendance || { hasCheckin: false, hasCheckout: false }
@@ -593,9 +626,7 @@ export default function EmployeeDetail() {
                     </div>
                 </div>
 
-                {/* Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                    {/* Rating Distribution */}
                     <div className="bg-white rounded-xl shadow-sm p-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Rating Distribution</h3>
                         <div className="h-64">
@@ -628,26 +659,25 @@ export default function EmployeeDetail() {
                         </div>
                     </div>
 
-                    {/* Monthly Trends */}
                     <div className="bg-white rounded-xl shadow-sm p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Attendance Trends</h3>
-                        <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={monthlyStats}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="month" />
-                                    <YAxis />
-                                    <Tooltip />
-                                    <Bar dataKey="completedDays" fill="#3b82f6" name="Completed Days" />
-                                    <Bar dataKey="totalDays" fill="#e5e7eb" name="Total Days" />
-                                    <Bar dataKey="leaveDays" fill="#60a5fa" name="Leave Days" />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Attendance Trends</h3>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={monthlyStats}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="month" />
+                                        <YAxis />
+                                        <Tooltip />
+                                        <Bar dataKey="completedDays" fill="#34d399" name="Completed Days" /> {/* Bright Green */}
+                                        <Bar dataKey="totalDays" fill="#fbbf24" name="Total Days" />         {/* Bright Yellow */}
+                                        <Bar dataKey="leaveDays" fill="#f87171" name="Leave Days" />         {/* Bright Red */}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Monthly Work Summary */}
+                    </div>
+
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden mb-8">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-semibold text-gray-900">Monthly Work Summary</h2>
@@ -696,7 +726,6 @@ export default function EmployeeDetail() {
                     </div>
                 </div>
 
-                {/* Attendance and Leave History */}
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                     <div className="px-6 py-4 border-b border-gray-200">
                         <h2 className="text-lg font-semibold text-gray-900">Attendance and Leave History</h2>
@@ -732,10 +761,10 @@ export default function EmployeeDetail() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {record.check_in_time}
+                                        {formatTime(record.check_in_time)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        {record.check_out_time}
+                                        {formatTime(record.check_out_time)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {record.hours}
@@ -802,7 +831,7 @@ export default function EmployeeDetail() {
                         hoveredCell.attendance.rating,
                         hoveredCell.date,
                         hoveredCell.attendance.type,
-                        hoveredCell.attendance.leaveDescription
+                        hoveredCell.attendance.description
                     )}
                 </div>
             )}
