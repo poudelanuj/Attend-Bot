@@ -29,18 +29,21 @@ interface KPIData {
     today_checkouts: number;
     today_avg_rating: number;
     today_avg_hours: number;
+    today_leaves: number;
   };
   month: {
     active_employees: number;
     completed_days: number;
     month_avg_rating: number;
     month_avg_hours: number;
+    total_leave_days: number;
   };
   year: {
     active_employees: number;
     completed_days: number;
     year_avg_rating: number;
     year_avg_hours: number;
+    total_leave_days: number;
   };
 }
 
@@ -58,6 +61,7 @@ interface TodayRecord {
   tomorrow_priorities: string;
   overall_rating: number;
   hours_worked: number;
+  work_from: string;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
@@ -164,7 +168,7 @@ export default function Dashboard() {
           {/* Today's KPIs */}
           <div className="mb-8">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <div className="flex items-center">
                   <div className="p-2 bg-blue-100 rounded-lg">
@@ -228,6 +232,18 @@ export default function Dashboard() {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="flex items-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Calendar className="w-6 h-6 text-yellow-600" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">On Leave</p>
+                    <p className="text-2xl font-bold text-gray-900">{kpis?.today.today_leaves || 0}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -250,6 +266,13 @@ export default function Dashboard() {
                   </div>
                   <p className="text-sm text-gray-600">Completed Days</p>
                   <p className="text-xl font-bold text-gray-900">{kpis?.month.completed_days || 0}</p>
+                </div>
+                <div className="text-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg inline-flex mb-2">
+                    <Calendar className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Leave Days</p>
+                  <p className="text-xl font-bold text-gray-900">{kpis?.month.total_leave_days || 0}</p>
                 </div>
                 <div className="text-center">
                   <div className="p-2 bg-purple-100 rounded-lg inline-flex mb-2">
@@ -289,6 +312,13 @@ export default function Dashboard() {
                   </div>
                   <p className="text-sm text-gray-600">Completed Days</p>
                   <p className="text-xl font-bold text-gray-900">{kpis?.year.completed_days || 0}</p>
+                </div>
+                <div className="text-center">
+                  <div className="p-2 bg-yellow-100 rounded-lg inline-flex mb-2">
+                    <Calendar className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <p className="text-sm text-gray-600">Leave Days</p>
+                  <p className="text-xl font-bold text-gray-900">{kpis?.year.total_leave_days || 0}</p>
                 </div>
                 <div className="text-center">
                   <div className="p-2 bg-purple-100 rounded-lg inline-flex mb-2">
