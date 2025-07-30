@@ -4,7 +4,9 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import EmployeeDetail from './components/EmployeeDetail';
 import ContributionMatrix from './components/ContributionMatrix';
+import Sidebar from './components/Sidebar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import './styles/sidebar.css';
 
 function AppRoutes() {
   const { token, loading } = useAuth();
@@ -17,25 +19,27 @@ function AppRoutes() {
     );
   }
 
+  if (!token) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" />} />
+      </Routes>
+    );
+  }
+
   return (
-    <Routes>
-      <Route 
-        path="/login" 
-        element={token ? <Navigate to="/" /> : <Login />} 
-      />
-      <Route 
-        path="/" 
-        element={token ? <Dashboard /> : <Navigate to="/login" />} 
-      />
-      <Route 
-        path="/employee/:id" 
-        element={token ? <EmployeeDetail /> : <Navigate to="/login" />} 
-      />
-      <Route 
-        path="/matrix" 
-        element={token ? <ContributionMatrix /> : <Navigate to="/login" />} 
-      />
-    </Routes>
+    <>
+      <Sidebar />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/employee/:id" element={<EmployeeDetail />} />
+          <Route path="/matrix" element={<ContributionMatrix />} />
+          <Route path="/login" element={<Navigate to="/" />} />
+        </Routes>
+      </main>
+    </>
   );
 }
 

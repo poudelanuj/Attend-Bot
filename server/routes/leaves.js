@@ -26,11 +26,37 @@ router.get('/date/:date', async (req, res) => {
   }
 });
 
+// Get remaining leave for an employee
+router.get('/balance/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const leaveInfo = await Leave.calculateRemainingLeave(employeeId);
+    res.json(leaveInfo);
+  } catch (error) {
+    console.error('Error calculating remaining leave:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get leaves for an employee
 router.get('/:employeeId', async (req, res) => {
   try {
     const { employeeId } = req.params;
     const leaves = await Leave.getEmployeeLeaves(employeeId);
-    res.json(leaves);
+    
+    // Calculate remaining leave
+    let leaveInfo = null;
+    try {
+      leaveInfo = await Leave.calculateRemainingLeave(employeeId);
+    } catch (balanceError) {
+      console.error('Error calculating leave balance:', balanceError);
+      // Continue even if leave balance calculation fails
+    }
+    
+    res.json({
+      leaves,
+      leaveInfo
+    });
   } catch (error) {
     console.error('Error fetching leaves for employee:', error);
     res.status(500).json({ message: 'Server error' });
