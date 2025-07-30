@@ -1,5 +1,6 @@
 import express from 'express';
 import { ProjectSettings } from '../models/ProjectSettings.js';
+import { pool } from '../database.js';
 
 const router = express.Router();
 

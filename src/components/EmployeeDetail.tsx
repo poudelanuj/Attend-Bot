@@ -54,7 +54,7 @@ interface AttendanceData {
             rating?: number;
             workFrom?: string;
             status?: string;
-            isLeave?: boolean;
+            type?: string;
             leaveDescription?: string;
         };
     };
@@ -78,7 +78,7 @@ export default function EmployeeDetail() {
         employeeId: number;
         date: string;
         level: number;
-        attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number; workFrom?: string; status?: string; isLeave?: boolean; leaveDescription?: string };
+        attendance: { hasCheckin: boolean; hasCheckout: boolean; rating?: number; workFrom?: string; status?: string; type?: string; leaveDescription?: string };
     } | null>(null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
@@ -222,17 +222,21 @@ export default function EmployeeDetail() {
         // Future dates or before project start date
         if (dateObj > today || (projectStartDate && dateObj < projectStartDate)) return 0;
 
-        // Check if it's a holiday (Saturday)
-        const isHoliday = holidays.some((holiday) => holiday.date === date);
+        // Check if it's a holiday
+        const holiday = holidays.find((h) => h.date === date);
         const isSaturday = dateObj.getDay() === 6;
 
-        if (isHoliday || isSaturday) {
-            return 6; // Gray for Saturdays/holidays
+        if (isSaturday) {
+            return 6; // Gray for Saturday (default holiday)
+        }
+
+        if (holiday) {
+            return 5; // Purple for other holidays
         }
 
         if (!attendance) return 8; // No activity on a working day
 
-        if (attendance.isLeave) return 7; // Blue for leave
+        if (attendance.type === 'leave') return 7; // Blue for leave
 
         if (attendance.hasCheckin && attendance.hasCheckout) {
             if (attendance.rating) {
@@ -255,6 +259,7 @@ export default function EmployeeDetail() {
             2: 'bg-green-200', // Check-in + check-out
             3: 'bg-green-400', // Rating 4
             4: 'bg-green-600', // Rating 5
+            5: 'bg-purple-400', // Other holidays
             6: 'bg-gray-200', // Saturday/holiday
             7: 'bg-blue-400', // Leave
             8: 'bg-red-400', // No activity on working day
@@ -268,7 +273,7 @@ export default function EmployeeDetail() {
         hasCheckout: boolean,
         rating: number | undefined,
         dateStr: string,
-        isLeave?: boolean,
+        type?: string,
         leaveDescription?: string
     ): string => {
         const date = new Date(dateStr).toLocaleDateString();
@@ -282,11 +287,15 @@ export default function EmployeeDetail() {
         const holiday = holidays.find((h) => h.date === dateStr);
         const isSaturday = dateObj.getDay() === 6;
 
-        if (holiday || isSaturday) {
-            return `${date}: Saturday (Holiday)${holiday?.description ? ` - ${holiday.description}` : ''}`;
+        if (isSaturday) {
+            return `${date}: Saturday (Holiday)`;
         }
 
-        if (isLeave) {
+        if (holiday) {
+            return `${date}: ${holiday.name}${holiday.description ? ` - ${holiday.description}` : ''}`;
+        }
+
+        if (type === 'leave') {
             return `${date}: On Leave${leaveDescription ? ` - ${leaveDescription}` : ''}`;
         }
 
@@ -556,23 +565,20 @@ export default function EmployeeDetail() {
                                             <div key={weekIndex} className="flex flex-col gap-[2px]">
                                                 {week.days.map((dayData, dayIndex) => {
                                                     const level = dayData.isCurrentYear ? getContributionLevel(employee.id, dayData.dateStr) : 0;
-                                                    const attendance = attendanceData[employee.id]?.[dayData.dateStr] || {
-                                                        hasCheckin: false,
-                                                        hasCheckout: false,
-                                                        rating: undefined,
-                                                        isLeave: false
-                                                    };
+                                                    const attendance = attendanceData[employee.id]?.[dayData.dateStr];
 
                                                     return (
                                                         <div
                                                             key={dayIndex}
                                                             className={`w-3 h-3 rounded-sm cursor-pointer transition-all hover:ring-1 hover:ring-gray-400 ${getLevelColor(level)}`}
-                                                            onMouseEnter={() => setHoveredCell({
-                                                                employeeId: employee.id,
-                                                                date: dayData.dateStr,
-                                                                level,
-                                                                attendance
-                                                            })}
+                                                            onMouseEnter={() =>
+                                                                setHoveredCell({
+                                                                    employeeId: employee.id,
+                                                                    date: dayData.dateStr,
+                                                                    level,
+                                                                    attendance: attendance || { hasCheckin: false, hasCheckout: false }
+                                                                })
+                                                            }
                                                             onMouseLeave={() => setHoveredCell(null)}
                                                         />
                                                     );
@@ -795,7 +801,7 @@ export default function EmployeeDetail() {
                         hoveredCell.attendance.hasCheckout,
                         hoveredCell.attendance.rating,
                         hoveredCell.date,
-                        hoveredCell.attendance.isLeave,
+                        hoveredCell.attendance.type,
                         hoveredCell.attendance.leaveDescription
                     )}
                 </div>
