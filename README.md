@@ -10,11 +10,13 @@ A comprehensive attendance management system featuring a Discord bot for employe
 - **Status Command** (`/status`): View personal attendance statistics
 - Interactive modal forms for seamless data collection
 
-### Admin Dashboard
-- **Employee Management**: View all employees with attendance statistics
-- **Analytics Dashboard**: Visual charts showing attendance trends and ratings
-- **Employee Detail Pages**: Individual employee records with complete attendance history
-- **Secure Authentication**: JWT-based admin login system
+### Modern Admin Dashboard 🎨
+- **Beautiful UI**: Modern glassmorphism design with smooth animations
+- **Employee Management**: Advanced search and filtering with elegant cards
+- **Real-time Analytics**: Interactive charts and live updating statistics
+- **Employee Profiles**: Detailed individual records with visual indicators
+- **Responsive Design**: Perfect on desktop, tablet, and mobile devices
+- **Secure Authentication**: JWT-based login with modern design
 
 ### Database Schema
 - Employees table with Discord integration
@@ -49,6 +51,7 @@ JWT_SECRET=your_jwt_secret_key
 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_admin_password
+ORIGIN=your_frontend_url
 ```
 
 ### 3. Discord Bot Setup

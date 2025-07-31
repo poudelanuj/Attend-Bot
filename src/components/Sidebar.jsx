@@ -1,10 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { 
+  Home, 
+  Users, 
+  Grid3X3, 
+  Calendar, 
+  Settings, 
+  LogOut, 
+  Menu, 
+  X,
+  Zap,
+  TrendingUp
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import '../styles/sidebar.css';
 
 const Sidebar = () => {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { logout } = useAuth();
 
   useEffect(() => {
     // Close sidebar when route changes on mobile
@@ -36,102 +50,69 @@ const Sidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  const handleLogout = () => {
+    logout();
+    window.location.href = '/login';
+  };
+
+  const menuItems = [
+    { path: '/', icon: Home, label: 'Dashboard' },
+    { path: '/employees', icon: Users, label: 'Employees' },
+    { path: '/matrix', icon: Grid3X3, label: 'Matrix View' },
+    { path: '/holidays', icon: Calendar, label: 'Holidays' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
+  ];
+
   return (
     <>
       {/* Mobile Toggle Button */}
       <button
-        className="sidebar-toggle"
+        className="sidebar-toggle md:hidden"
         onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="3" y1="12" x2="21" y2="12"></line>
-          <line x1="3" y1="6" x2="21" y2="6"></line>
-          <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
+        {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
+
+      {/* Mobile Backdrop */}
+      <div 
+        className={`sidebar-backdrop md:hidden ${isSidebarOpen ? 'open' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
 
       <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-            <line x1="8" y1="21" x2="16" y2="21"></line>
-            <line x1="12" y1="17" x2="12" y2="21"></line>
-          </svg>
+          <div className="sidebar-logo">
+            <Zap />
+          </div>
           <h1>AttendBot</h1>
         </div>
 
         <nav className="sidebar-menu">
           <ul>
-            <li>
-              <Link to="/" className={location.pathname === '/' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
-                Dashboard
-              </Link>
-            </li>
-            <li>
-              <Link to="/employees" className={location.pathname === '/employees' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                Employees
-              </Link>
-            </li>
-            <li>
-              <Link to="/matrix" className={location.pathname === '/matrix' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="14" width="7" height="7"></rect>
-                  <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-                Contribution Matrix
-              </Link>
-            </li>
-            <li>
-              <Link to="/holidays" className={location.pathname === '/holidays' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg"
-                     width="24" height="24" viewBox="0 0 24 24"
-                     fill="none" stroke="currentColor"
-                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 6.1a4 4 0 0 1 1.4 7.7" />
-                  <path d="M13 12h1l3 9" />
-                  <path d="M12 2v10" />
-                  <path d="M9 12h1l-3 9" />
-                  <path d="M4.6 13.8a4 4 0 1 1 4.9-6.3" />
-                  <path d="M12 6a4 4 0 1 0-4-4" />
-                </svg>
-
-                Holiday
-              </Link>
-            </li>
-            <li>
-              <Link to="/settings" className={location.pathname === '/settings' ? 'active' : ''}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3"></circle>
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                </svg>
-                Settings
-              </Link>
-            </li>
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              
+              return (
+                <li key={item.path}>
+                  <Link 
+                    to={item.path} 
+                    className={isActive ? 'active' : ''}
+                    onClick={() => setIsSidebarOpen(false)}
+                  >
+                    <Icon />
+                    <span>{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
         <div className="sidebar-footer">
-          <button className="logout-button" onClick={() => {
-            localStorage.removeItem('token');
-            window.location.href = '/login';
-          }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-              <polyline points="16 17 21 12 16 7"></polyline>
-              <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
+          <button onClick={handleLogout} aria-label="Logout">
+            <LogOut />
             <span>Logout</span>
           </button>
         </div>
