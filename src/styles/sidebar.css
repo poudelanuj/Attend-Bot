@@ -47,10 +47,10 @@
 }
 
 .sidebar-logo {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-  border-radius: 12px;
+  width: 60px;
+  height: 40px;
+  background: #ffffff;
+  border-radius: 2px;
   display: flex;
   align-items: center;
   justify-content: center;

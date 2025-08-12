@@ -4,7 +4,7 @@ export const up = async function (knex) {
     // Create employees table
     await knex.schema.createTable('employees', (table) => {
         table.increments('id').primary();
-        table.string('discord_id', 20).unique().notNullable();
+        table.string('platform_id', 20).unique().notNullable();
         table.string('username', 100).notNullable();
         table.string('display_name', 100);
         table.string('email', 255);
@@ -57,7 +57,7 @@ export const up = async function (knex) {
     });
 
     await knex.schema.table('employees', (table) => {
-        table.index('discord_id', 'idx_employees_discord_id');
+        table.index('platform_id', 'idx_employees_platform_id');
     });
 };
 

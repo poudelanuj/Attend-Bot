@@ -16,6 +16,10 @@ const commands = [
     name: 'status',
     description: 'View your attendance status and statistics',
   },
+  {
+    name: 'leave',
+    description: 'Apply for leave',
+  },
 ];
 
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);

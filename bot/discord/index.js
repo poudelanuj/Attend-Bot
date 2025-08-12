@@ -15,9 +15,9 @@ import {
     ButtonStyle
 } from 'discord.js';
 import dotenv from 'dotenv';
-import {Employee} from '../server/models/Employee.js';
-import {Attendance} from '../server/models/Attendance.js';
-import {Leave} from '../server/models/Leave.js';
+import {Employee} from '../../server/models/Employee.js';
+import {Attendance} from '../../server/models/Attendance.js';
+import {Leave} from '../../server/models/Leave.js';
 import cron from 'node-cron';
 
 // Temporary storage for select menu choices
@@ -62,53 +62,55 @@ client.once('ready', async () => {
     }
 });
 
-// 9:55 AM NPT Check-in DM (Mon–Fri, excluding Saturday)
-cron.schedule('55 9 * * 0-5', async () => {
-    try {
-        console.log("Check-in reminder running at 9:55 AM NPT");
-        const guild = await client.guilds.fetch(process.env.GUILD_ID);
-        const members = await guild.members.fetch();
+client.on('ready', async () => {
+    // 9:55 AM NPT Check-in DM (Mon–Fri, excluding Saturday)
+    cron.schedule('55 9 * * 0-5', async () => {
+        try {
+            console.log("Check-in reminder running at 9:55 AM NPT");
+            const guild = await client.guilds.fetch(process.env.GUILD_ID);
+            const members = await guild.members.fetch();
 
-        members.forEach(async (member) => {
-            if (!member.user.bot) {
-                try {
-                    await member.send('🌞 Good morning! Please don\'t forget to `/checkin` today.');
-                } catch (err) {
-                    console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+            members.forEach(async (member) => {
+                if (!member.user.bot) {
+                    try {
+                        await member.send('🌞 Good morning! Please don\'t forget to `/checkin` today.');
+                    } catch (err) {
+                        console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+                    }
                 }
-            }
-        });
-        console.log('✅ Check-in DMs sent at 9:55 AM NPT');
-    } catch (error) {
-        console.error('❌ Error during check-in DM:', error);
-    }
-}, {
-    timezone: 'Asia/Kathmandu'
-});
+            });
+            console.log('✅ Check-in DMs sent at 9:55 AM NPT');
+        } catch (error) {
+            console.error('❌ Error during check-in DM:', error);
+        }
+    }, {
+        timezone: 'Asia/Kathmandu'
+    });
 
 // 4:55 PM NPT Check-out DM (Mon–Fri, excluding Sunday)
-cron.schedule('55 16 * * 0-5', async () => {
-    try {
-        console.log("Check-out reminder running at 4:55 PM NPT");
-        const guild = await client.guilds.fetch(process.env.GUILD_ID);
-        const members = await guild.members.fetch();
+    cron.schedule('55 16 * * 0-5', async () => {
+        try {
+            console.log("Check-out reminder running at 4:55 PM NPT");
+            const guild = await client.guilds.fetch(process.env.GUILD_ID);
+            const members = await guild.members.fetch();
 
-        members.forEach(async (member) => {
-            if (!member.user.bot) {
-                try {
-                    await member.send('🌇 The work day is over! Please remember to `/checkout` before leaving.');
-                } catch (err) {
-                    console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+            members.forEach(async (member) => {
+                if (!member.user.bot) {
+                    try {
+                        await member.send('🌇 The work day is over! Please remember to `/checkout` before leaving.');
+                    } catch (err) {
+                        console.warn(`❌ Could not DM ${member.user.tag}:`, err.message);
+                    }
                 }
-            }
-        });
-        console.log('✅ Check-out DMs sent at 4:55 PM NPT');
-    } catch (error) {
-        console.error('❌ Error during check-out DM:', error);
-    }
-}, {
-    timezone: 'Asia/Kathmandu'
-});
+            });
+            console.log('✅ Check-out DMs sent at 4:55 PM NPT');
+        } catch (error) {
+            console.error('❌ Error during check-out DM:', error);
+        }
+    }, {
+        timezone: 'Asia/Kathmandu'
+    });
+})
 
 // Handle interactions (slash commands, select menus, buttons, modals)
 client.on('interactionCreate', async (interaction) => {
@@ -143,7 +145,7 @@ client.on('interactionCreate', async (interaction) => {
 async function handleCheckIn(interaction) {
     try {
         // Check if user already checked in today
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
         if (employee) {
             // Check if on leave today
             const todayLeave = await Leave.getTodayLeave(employee.id);
@@ -342,17 +344,17 @@ async function processCheckIn(interaction) {
         const currentStatus = userSelections.currentStatus;
         const workFrom = userSelections.workFrom;
 
-        let employee = await Employee.findByDiscordId(interaction.user.id);
+        let employee = await Employee.findByPlatformId(interaction.user.id);
         if (!employee) {
             await Employee.create({
-                discordId: interaction.user.id,
+                platformId: interaction.user.id,
                 username: interaction.user.username,
                 displayName: interaction.user.displayName || interaction.user.username,
                 email: null,
                 department: null,
                 position: null
             });
-            employee = await Employee.findByDiscordId(interaction.user.id);
+            employee = await Employee.findByPlatformId(interaction.user.id);
         }
 
         await Attendance.checkIn(employee.id, {
@@ -387,17 +389,17 @@ async function processCheckIn(interaction) {
 
 async function handleLeave(interaction) {
     try {
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
         if (!employee) {
             await Employee.create({
-                discordId: interaction.user.id,
+                platformId: interaction.user.id,
                 username: interaction.user.username,
                 displayName: interaction.user.displayName || interaction.user.username,
                 email: null,
                 department: null,
                 position: null
             });
-            const newEmployee = await Employee.findByDiscordId(interaction.user.id);
+            const newEmployee = await Employee.findByPlatformId(interaction.user.id);
             employee = newEmployee;
         }
 
@@ -446,7 +448,7 @@ async function handleLeave(interaction) {
 async function processLeave(interaction) {
     try {
         const description = interaction.fields.getTextInputValue('leave_description');
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
 
         await Leave.applyLeave(employee.id, description);
 
@@ -470,7 +472,7 @@ async function processLeave(interaction) {
 
 async function handleCheckOut(interaction) {
     try {
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
         if (!employee) {
             await interaction.reply({content: '❌ Please check in first before checking out.', ephemeral: true});
             return;
@@ -558,7 +560,7 @@ async function processCheckOut(interaction) {
             return;
         }
 
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
 
         await Attendance.checkOut(employee.id, {
             accomplishments,
@@ -591,7 +593,7 @@ async function processCheckOut(interaction) {
 
 async function handleStatus(interaction) {
     try {
-        const employee = await Employee.findByDiscordId(interaction.user.id);
+        const employee = await Employee.findByPlatformId(interaction.user.id);
         if (!employee) {
             await interaction.reply({content: '❌ No attendance record found. Please check in first.', ephemeral: true});
             return;

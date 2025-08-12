@@ -10,11 +10,13 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "node server/index.js",
-    "bot": "node bot/index.js",
+    "discord": "node bot/discord/index.js",
+    "slack": "node bot/slack/index.js",
     "migrate": "knex migrate:latest",
     "migrate:make": "knex migrate:make"
   },
   "dependencies": {
+    "@slack/bolt": "^4.4.0",
     "axios": "^1.6.2",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",

@@ -1,23 +1,34 @@
 import { pool } from '../database.js';
 
 export class Employee {
-  static async findByDiscordId(discordId) {
+  static async findByPlatformId(platformId) {
     const [rows] = await pool.execute(
-      'SELECT * FROM employees WHERE discord_id = ?',
-      [discordId]
+      'SELECT * FROM employees WHERE platform_id = ?',
+      [platformId]
     );
     return rows[0];
   }
 
   static async create(employeeData) {
     console.log(employeeData)
-    const { discordId, username, displayName, email, department, position } = employeeData;
-    const [result] = await pool.execute(
-      `INSERT INTO employees (discord_id, username, display_name, email, department, position) 
+      if(process.env.PLATFORM==='slack'){
+          const { slackId, username, displayName, email, department, position } = employeeData;
+          const [result] = await pool.execute(
+              `INSERT INTO employees (platform_id, username, display_name, email, department, position) 
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [discordId, username, displayName, email, department, position]
-    );
-    return result.insertId;
+              [slackId, username, displayName, email, department, position]
+          );
+          return result.insertId;
+      }else if(process.env.PLATFORM==='discord'){
+          const { discordId, username, displayName, email, department, position } = employeeData;
+          const [result] = await pool.execute(
+              `INSERT INTO employees (platform_id, username, display_name, email, department, position) 
+       VALUES (?, ?, ?, ?, ?, ?)`,
+              [discordId, username, displayName, email, department, position]
+          );
+          return result.insertId;
+      }
+
   }
 
   static async findAll() {

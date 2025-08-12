@@ -4,12 +4,12 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import EmployeeDetail from './components/EmployeeDetail';
 import ContributionMatrix from './components/ContributionMatrix';
-import Sidebar from './components/Sidebar';
 import {AuthProvider, useAuth} from './contexts/AuthContext';
 import './styles/sidebar.css';
 import Employees from "./components/Employees.tsx";
 import ProjectSettingsPage from "./components/ProjectSettingsPage.tsx";
 import HolidayManagerPage from "./components/HolidayManagerPage.tsx";
+import Sidebar from "./components/Sidebar.tsx";
 
 function AppRoutes() {
     const {token, loading} = useAuth();

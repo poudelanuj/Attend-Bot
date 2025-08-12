@@ -20,29 +20,31 @@ services:
       - PORT=5005
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-
-    depends_on:
-      - bot
+      - VITE_API_URL=${VITE_API_URL}
     networks:
       - app-network
     command: node index.js --port 5005
+    restart: unless-stopped
 
-  bot:
+  discord-bot:
     platform: linux/amd64
     build:
       context: .
-      dockerfile: bot/Dockerfile
+      dockerfile: bot/discord/Dockerfile
     image: 595739921426.dkr.ecr.ap-south-1.amazonaws.com/attendbot/bot:latest
     environment:
+      - NODE_ENV=production
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GUILD_ID=${GUILD_ID}
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - PLATFORM=discord
     networks:
       - app-network
-    command: npm run bot
+    command: npm run discord
 
   frontend:
     platform: linux/amd64
@@ -56,6 +58,7 @@ services:
       - ./dist:/app/dist
     environment:
       - VITE_API_URL=${VITE_API_URL}
+      - ORIGIN=${ORIGIN}
     networks:
       - app-network
     command: npm run build

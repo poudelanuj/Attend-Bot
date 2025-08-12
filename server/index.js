@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { testConnection } from './database.js';
 import { authenticateToken } from './middleware/auth.js';
+// No need to import Slack app here as it runs as a separate service
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -35,6 +36,15 @@ app.use('/api/attendance', authenticateToken, attendanceRoutes);
 app.use('/api/holidays', authenticateToken, holidayRoutes);
 app.use('/api/settings', authenticateToken, settingsRoutes);
 app.use('/api/leaves', authenticateToken, leaves);
+
+// Add a simple status endpoint for Slack
+app.get('/api/slack/status', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Slack API endpoints are available, but handled by separate service',
+    note: 'Make sure the Slack bot service is running on port 3002'
+  });
+});
 
 
 // Health check
